@@ -1,0 +1,63 @@
+/*
+ * LINE Pay 리워드 서비스 빌드 스크립트
+ *
+ * 제출물 구조(과제 16절)에 맞추기 위해 소스 경로를 재지정한다.
+ *  - 애플리케이션 코드 : source-code/src/main
+ *  - 자동화 테스트 코드 : test-or-verification/src/test
+ *
+ * 사용 기술: Java 21, Spring Boot, Gradle, H2, JUnit5 (그 외 의존성 추가 없음)
+ */
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.5.16'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.linepay'
+version = '0.0.1'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+sourceSets {
+    main {
+        java { srcDirs = ['source-code/src/main/java'] }
+        resources { srcDirs = ['source-code/src/main/resources'] }
+    }
+    test {
+        java { srcDirs = ['test-or-verification/src/test/java'] }
+        resources { srcDirs = ['test-or-verification/src/test/resources'] }
+    }
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    runtimeOnly 'com.h2database:h2'
+
+    // JUnit5 기반 테스트 (spring-boot-starter-test 에 JUnit Jupiter 포함)
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-parameters'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    // 테스트 결과를 콘솔에서도 확인할 수 있도록 출력
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        exceptionFormat = 'full'
+    }
+    systemProperty 'file.encoding', 'UTF-8'
+}
