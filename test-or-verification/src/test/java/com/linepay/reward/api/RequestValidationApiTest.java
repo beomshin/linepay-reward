@@ -19,7 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * 요청값 검증 (교정 1: Spring Validation)
  * - 필수값 누락 → 400 MISSING_REQUIRED_VALUE
- * - 형식 오류   → 400 INVALID_FORMAT
+ * - 형식 오류   → 400 INVALID_FORMAT (participationId 가 정수가 아닌 경우)
  * - 범위 오류   → 400 OUT_OF_RANGE
  * 모든 응답은 영문 코드 + 한글 메시지 + data=null 이며, 검증 실패 시 서비스 로직까지 전달되지 않는다.
  */
@@ -53,33 +53,38 @@ class RequestValidationApiTest extends IntegrationTestSupport {
         assertThat(participationRepository.count()).isZero();
     }
 
+    /*
+     * userId·missionId 는 @NotBlank(필수값)만 검증한다. 형식(@Pattern)·길이(@Size) 제한은 두지 않으므로
+     * 특수문자·한글·긴 값은 요청값 검증을 통과하고, 서비스의 존재 여부 확인에서 404 로 거절된다.
+     */
     @ParameterizedTest
     @ValueSource(strings = {"USER-0001", "USER 0001", "유저0001", "USER@0001", "USER.0001"})
-    @DisplayName("QA-V03 형식 오류: 허용되지 않은 문자가 포함된 userId → 400 INVALID_FORMAT")
-    void invalidUserIdFormat(String userId) throws Exception {
+    @DisplayName("QA-V03 형식 제한 없음: 특수문자·한글이 포함된 userId → 검증 통과 후 404 USER_NOT_FOUND")
+    void userIdWithoutFormatRule(String userId) throws Exception {
         mockMvc.perform(get("/linepay/v1/mission/{userId}", userId))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_FORMAT"))
-                .andExpect(jsonPath("$.msg").value("요청값 형식이 올바르지 않습니다. (userId)"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("USER_NOT_FOUND"))
+                .andExpect(jsonPath("$.msg").value("사용자를 찾을 수 없습니다."))
                 .andExpect(jsonPath("$.data").value(nullValue()));
     }
 
     @Test
-    @DisplayName("QA-V04 형식 오류: 50자를 넘는 userId → 400 INVALID_FORMAT")
+    @DisplayName("QA-V04 길이 제한 없음: 50자를 넘는 userId → 검증 통과 후 404 USER_NOT_FOUND")
     void tooLongUserId() throws Exception {
         mockMvc.perform(post("/linepay/v1/reward/{userId}/1", TOO_LONG_ID))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_FORMAT"))
-                .andExpect(jsonPath("$.msg").value("요청값 형식이 올바르지 않습니다. (userId)"));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("USER_NOT_FOUND"));
     }
 
     @Test
-    @DisplayName("QA-V05 형식 오류: 허용되지 않은 문자가 포함된 missionId → 400 INVALID_FORMAT")
-    void invalidMissionIdFormat() throws Exception {
+    @DisplayName("QA-V05 형식 제한 없음: 특수문자가 포함된 missionId → 404 MISSION_NOT_FOUND, 참여 이력 생성 안 됨")
+    void missionIdWithoutFormatRule() throws Exception {
         mockMvc.perform(post("/linepay/v1/mission/USER_0001/{missionId}/complete", "MISSION-0002"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_FORMAT"))
-                .andExpect(jsonPath("$.msg").value("요청값 형식이 올바르지 않습니다. (missionId)"));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("MISSION_NOT_FOUND"))
+                .andExpect(jsonPath("$.msg").value("미션을 찾을 수 없습니다."));
+
+        assertThat(participationRepository.count()).isZero();
     }
 
     @Test

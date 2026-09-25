@@ -257,17 +257,115 @@ Java 21, Spring Boot, Gradle, H2, JUnit5을 사용하며, 그밖 의존성은 �
 
 ## 13.4 주요 교정 기록
 
-### 교정 기록 1.
+### 교정 기록 1. 코드 최적화 (Lombok · 생성자 주입 · 요청값 검증)
 
-| 항목 | 내용 |
+#### 1) 교정 기록 제목
+
+코드 최적화: Lombok 적용, `@RequiredArgsConstructor` 생성자 주입 통일, Spring Validation 요청값 검증 도입
+
+#### 2) 교정이 필요하다고 판단한 이유
+
+- Getter·생성자 등 반복 코드가 많아 가독성이 떨어지고, 필드를 추가하거나 바꿀 때 수정이 누락될 위험이 있음
+- 의존성 주입 방식을 코드 규칙으로 통일해 불변성(`final`)과 테스트 용이성을 확보할 필요가 있음
+- 요청값 검증이 선언적으로 이루어지지 않아, 잘못된 값(공백, 숫자가 아닌 값, 0 이하 값 등)이 서비스 로직까지 전달될 수 있음
+- 13.3 초기 결과 검토의 "부족한 부분 4번(서비스 운영 편의: 영문 코드 + 한글 메시지, Spring Validation)"과 "추가 확인 3번(Lombok, 생성자 주입)"에 대한 후속 조치
+
+#### 3) AI에 전달한 후속 지시 원문
+
+세션 지시: `전달된 프롬프트를 프로젝트 적용 개발 진행하기`
+
+첨부한 교정 프롬프트(`교정_1_코드최적화_프롬프트.md`) 원문:
+
+````markdown
+# 코드 최적화 (Lombok · 생성자 주입 · 요청값 검증)
+
+검증된 표준 라이브러리와 Spring 권장 방식을 적용하여, 기능 변경 없이 코드 품질과 유지보수성을 개선해 주세요.
+
+## 교정 사유
+1. Getter·생성자 등 반복 코드가 많아 가독성이 떨어지고 수정 누락 위험이 있음
+2. 의존성 주입 방식이 일관되지 않아 불변성 보장과 테스트 용이성이 부족함
+3. 요청값 검증이 선언적으로 이루어지지 않아 잘못된 값이 서비스 로직까지 전달될 수 있음
+
+## 지시 사항
+1. Lombok을 적용하되, JPA 엔티티에는 `@Data`, `@Setter` 사용을 금지하고 안전한 어노테이션만 사용
+2. 모든 의존성을 `private final` + `@RequiredArgsConstructor` 생성자 주입으로 통일
+3. Spring Validation으로 요청값을 검증하고, 실패 시 영문 코드 + 한글 메시지로 응답하며 검증 실패 테스트 추가
+
+## 완료 조건
+1. 전체 테스트를 실행하여 기존 테스트케이스 통과 여부 확인
+2. 필수값 누락, 형식 오류, 범위 오류 시 400 응답과 정의된 코드·메시지 반환 확인
+3. 애플리케이션 기동 시 빈 주입 오류 발생 여부 확인
+````
+
+진행 중 추가 지시
+
+| 순서 | 상황 | 지시 |
+|:--:|---|---|
+| 1 | AI 질문: "영문 코드 + 한글 메시지" 지시가 최초 프롬프트 4.2의 응답 규격(`code="E404"`, `msg="MISSION_NOT_FOUND"`)과 달라 에러 응답 형식을 어떻게 맞출지 확인 요청 | 선택: **전체 에러 통일** (모든 에러를 `code`=영문 사유 코드, `msg`=한글 메시지로 변경) |
+| 2 | 적용 이후 `RequestValidationApiTest` 실패 | `RequestValidationApiTest 로직 테스트가 실패하는데 확인 후 수정` |
+
+#### 4) AI의 결과
+
+| 지시 사항 | AI 결과 |
 |---|---|
-| 교정 기록 제목 |  |
-| 교정이 필요하다고 판단한 이유 |  |
-| AI에 전달한 후속 지시 원문 |  |
-| AI의 결과 |  |
-| 본인의 판단 (그대로 반영 / 수정하여 반영 / 반영하지 않음 / 추가 확인 후 결정) |  |
-| 결과 검증 |  |
-| 최종 반영 위치 |  |
+| Lombok 적용 | `build.gradle`에 Lombok(compileOnly + annotationProcessor) 추가. 엔티티 5개(`User`, `Mission`, `MissionItem`, `MissionParticipation`, `Reward`)는 `@Getter` + `@NoArgsConstructor(access = PROTECTED)`만 사용하고 `@Data`·`@Setter`는 쓰지 않음. 수동 Getter·protected 기본 생성자 제거. 로거는 `@Slf4j`로 교체 |
+| 생성자 주입 통일 | `MissionService`, `RewardService`, `MissionController`, `RewardController`, `UserValidator`의 수동 생성자를 제거하고 `private final` + `@RequiredArgsConstructor`로 통일 |
+| Spring Validation | `spring-boot-starter-validation` 추가. 경로 변수에 `@NotBlank`(userId, missionId), `@NotNull`·`@Positive`(participationId) 선언. 처음에는 `userId`·`missionId`에 `@Size(max=50)`·`@Pattern`(영문·숫자·`_`)과 규칙 상수 클래스 `RequestIdRule`도 함께 적용함 |
+| 검증 실패 응답 | `GlobalExceptionHandler`에 `HandlerMethodValidationException`, `ConstraintViolationException` 처리 추가. 위반한 제약 종류에 따라 `MISSING_REQUIRED_VALUE` / `INVALID_FORMAT` / `OUT_OF_RANGE`(400)로 분류하고, 여러 제약을 동시에 위반하면 필수값 누락 → 범위 오류 → 형식 오류 순으로 하나만 응답. 한글 메시지 끝에 필드명을 붙임 (예: `요청값 형식이 올바르지 않습니다. (participationId)`) |
+| 에러 응답 형식 (추가 지시 1) | `ErrorCode`에 한글 `message` 필드를 추가하고, 실패 응답을 `code`=영문 사유 코드(enum 이름), `msg`=한글 메시지로 전체 변경. 기존 `INVALID_REQUEST`는 `INVALID_FORMAT`으로 대체. HTTP 상태 코드는 유지 |
+| 검증 실패 테스트 | `RequestValidationApiTest`(QA-V01~V09, 파라미터화 포함 15건) 추가. 에러 형식 변경에 맞춰 `RewardApiTest` 기대값 수정 |
+| 테스트 실패 수정 (추가 지시 2) | 원인 분석: 컨트롤러에서 `userId`·`missionId`의 `@Size`·`@Pattern`이 제거되고 `RequestIdRule`이 삭제된 상태였는데, 테스트는 이전 규칙(400 `INVALID_FORMAT`)을 기대하고 있었음. 코드 변경은 의도된 것으로 보고 유지하고, QA-V03~V05를 "형식·길이 제한 없음 → 검증 통과 후 404 `USER_NOT_FOUND` / `MISSION_NOT_FOUND`"로 수정 |
+| 과도한 로직 제거 (본인 판단 반영) | `GlobalExceptionHandler`의 `HandlerMethodValidationException` 처리를 단순화. 제약 우선순위 비교(`priority`), `ConstraintViolation` 변환과 예외 대체 처리, 제약 이름 Set을 제거하고, 첫 번째 위반 항목의 제약 이름을 `switch` 하나로 분류하도록 변경 |
+| 문서 반영 | `api-spec.md`(요청값 검증 규칙, 에러 코드·한글 메시지 표), `README.md`, `DESIGN.md`, `QA_LIST.md`(QA-V), `TEST_RESULT.md`, `api-verification.http` 갱신 |
+
+AI가 진행 중 발견해 보고한 사항
+
+- 교정 지시(영문 코드 + 한글 메시지)가 최초 프롬프트 4.2의 응답 예시와 충돌 → 임의로 정하지 않고 선택지를 제시해 확인 요청
+- `USER_0001;DROP` 테스트가 200으로 통과: Spring MVC가 `;` 뒤를 matrix variable로 보고 잘라낸 뒤 검증하는 프레임워크 동작. 테스트 값을 교체하고 `api-spec.md`에 동작을 기록
+- Lombok·Validation 추가는 최초 프롬프트의 "그밖 의존성은 임의로 추가하지 않는다"와 달라지는 변경임을 알림
+
+#### 5) 본인의 판단 (그대로 반영 / 수정하여 반영 / 반영하지 않음 / 추가 확인 후 결정)
+
+**수정하여 반영**
+
+| No | 수정 내용 | 판단 근거 |
+|:--:|---|---|
+| 1 | 클라이언트 요청 부분의 과도한 검증 로직 제거 | `userId`·`missionId`에 적용된 `@Size(max=50)`·`@Pattern`(영문·숫자·`_`)과 규칙 클래스 `RequestIdRule`은 과제 문서에 정의되지 않은 식별자 형식 제약이라 과도하다고 판단함. 필수값(`@NotBlank`) 검증만 남기고, 존재하지 않는 값은 서비스의 존재 여부 확인에서 404(`USER_NOT_FOUND` / `MISSION_NOT_FOUND`)로 거절되도록 함 |
+| 2 | `HandlerMethodValidationException` 처리의 과도한 로직 제거 | 1번 수정 후 경로 변수마다 검증 제약이 하나씩만 남아(`@NotBlank`, `@NotNull`·`@Positive`), 여러 제약 위반의 우선순위 비교나 `ConstraintViolation` 변환·대체 처리는 필요 이상으로 복잡하다고 판단함. 첫 번째 위반 항목의 제약 이름으로 에러 코드를 정하는 단순한 구조로 변경 |
+
+그 밖의 결과(Lombok 적용, `@RequiredArgsConstructor` 생성자 주입 통일, 에러 응답 형식 통일, 필수값·`participationId` 형식·범위 검증)는 그대로 반영함.
+
+#### 6) 결과 검증
+
+| 완료 조건 | 검증 방법 | 결과 |
+|---|---|---|
+| 기존 테스트케이스 통과 | IntelliJ 터미널에서 `gradlew.bat clean test` | 기존 58개 전부 통과 (에러 형식 변경에 따른 `RewardApiTest` 기대값만 수정) |
+| 필수값 누락·형식 오류·범위 오류 → 400 + 정의된 코드·메시지 | `RequestValidationApiTest`(MockMvc) + 실제 서버 호출 | 공백 → `MISSING_REQUIRED_VALUE`, 숫자가 아닌 `participationId` → `INVALID_FORMAT`, 0 이하 → `OUT_OF_RANGE`와 한글 메시지 확인 |
+| 애플리케이션 기동 시 빈 주입 오류 없음 | `bootJar` 후 `java -jar` 실행, 로그 확인 | `Started LinepayRewardApplication in 5.9 seconds`, 빈 생성·주입 오류 없음 |
+
+테스트 실행 이력
+
+| 회차 | 결과 | 비고 |
+|:--:|---|---|
+| 1 | 72/73 통과 | `USER_0001;DROP` 케이스 실패 (matrix variable 동작) → 테스트 값 교체 |
+| 2 | 73/73 통과 | 실제 서버 기동·API 호출 확인 |
+| 3 | 66/73 통과 | `@Size`·`@Pattern` 제거 후 QA-V03~V05 7건 실패 |
+| 4 | 73/73 통과 | 테스트를 현재 규칙에 맞춰 수정. 전체 실행과 `RequestValidationApiTest` 단독 실행 모두 통과 |
+| 5 | 73/73 통과 | `HandlerMethodValidationException` 처리 단순화 후 `gradlew.bat clean test bootJar` 재실행. 검증 응답 코드·메시지 변화 없음 |
+
+#### 7) 최종 반영 위치
+
+| 구분 | 파일 |
+|---|---|
+| 빌드 설정 | `build.gradle` (Lombok, spring-boot-starter-validation) |
+| 에러 코드·응답 | `common/exception/ErrorCode.java`, `common/response/ApiResponse.java`, `common/exception/GlobalExceptionHandler.java`(검증 예외 처리 단순화 포함), `common/exception/BusinessException.java` |
+| 요청값 검증 | `mission/controller/MissionController.java`, `reward/controller/RewardController.java` |
+| Lombok 엔티티 | `user/User.java`, `mission/domain/Mission.java`, `mission/domain/MissionItem.java`, `mission/domain/MissionParticipation.java`, `reward/domain/Reward.java` |
+| 생성자 주입 | `mission/service/MissionService.java`, `reward/service/RewardService.java`, `user/UserValidator.java`, 컨트롤러 2개 |
+| 테스트 | `test-or-verification/src/test/java/com/linepay/reward/api/RequestValidationApiTest.java`(신규), `api/RewardApiTest.java` |
+| 문서 | `api-spec.md`, `README.md`, `DESIGN.md`, `test-or-verification/QA_LIST.md`, `TEST_RESULT.md`, `api-verification.http` |
+
+(소스 경로 기준: `source-code/src/main/java/com/linepay/reward/`)
 
 ## 13.5 최종 회고
 

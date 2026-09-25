@@ -4,7 +4,6 @@ import com.linepay.reward.common.response.ApiResponse;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -15,8 +14,6 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import java.util.Set;
-
 /**
  * 전역 예외 핸들러.
  * <p>
@@ -25,12 +22,6 @@ import java.util.Set;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-
-    /** 필수값 누락으로 분류할 Bean Validation 제약 */
-    private static final Set<String> REQUIRED_CONSTRAINTS = Set.of("NotBlank", "NotNull", "NotEmpty");
-    /** 범위 오류로 분류할 Bean Validation 제약 */
-    private static final Set<String> RANGE_CONSTRAINTS =
-            Set.of("Positive", "PositiveOrZero", "Min", "Max", "DecimalMin", "DecimalMax");
 
     /** 비즈니스 규칙 위반 */
     @ExceptionHandler(BusinessException.class)
@@ -45,28 +36,14 @@ public class GlobalExceptionHandler {
 
     /**
      * 컨트롤러 요청값 검증 실패 (Spring MVC 내장 메서드 검증, @PathVariable 등).
-     * 첫 번째 위반 제약의 종류로 필수값 누락 / 형식 오류 / 범위 오류를 구분한다.
+     * 첫 번째 위반 항목의 제약 이름(메시지 코드 목록의 마지막 값, 예: "NotBlank")으로 에러 코드를 정한다.
      */
     @ExceptionHandler(HandlerMethodValidationException.class)
     public ResponseEntity<ApiResponse<Void>> handleHandlerMethodValidation(HandlerMethodValidationException e) {
-        // 한 값이 여러 제약을 동시에 위반할 수 있으므로(예: 공백 → NotBlank + Pattern)
-        // 필수값 누락 > 범위 오류 > 형식 오류 순으로 가장 우선하는 사유 하나를 응답한다.
-        ErrorCode selected = null;
-        String selectedField = null;
-        for (ParameterValidationResult result : e.getParameterValidationResults()) {
-            String field = result.getMethodParameter().getParameterName();
-            for (MessageSourceResolvable error : result.getResolvableErrors()) {
-                ErrorCode errorCode = classify(constraintName(result, error));
-                if (selected == null || priority(errorCode) < priority(selected)) {
-                    selected = errorCode;
-                    selectedField = field;
-                }
-            }
-        }
-        if (selected == null) {
-            return toResponse(ErrorCode.INVALID_FORMAT);
-        }
-        return toValidationResponse(selected, selectedField);
+        ParameterValidationResult result = e.getParameterValidationResults().get(0);
+        String[] codes = result.getResolvableErrors().get(0).getCodes();
+        String constraint = (codes == null || codes.length == 0) ? "" : codes[codes.length - 1];
+        return toValidationResponse(classify(constraint), result.getMethodParameter().getParameterName());
     }
 
     /** 서비스 계층 등에서 발생한 Bean Validation 위반 */
@@ -110,43 +87,16 @@ public class GlobalExceptionHandler {
         return toResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     }
 
-    /** 검증 에러 우선순위 (작을수록 우선) */
-    private int priority(ErrorCode errorCode) {
-        return switch (errorCode) {
-            case MISSING_REQUIRED_VALUE -> 0;
-            case OUT_OF_RANGE -> 1;
-            default -> 2;
-        };
-    }
-
-    /** 제약 어노테이션 이름 → 검증 에러 코드 */
-    private ErrorCode classify(String constraint) {
-        if (REQUIRED_CONSTRAINTS.contains(constraint)) {
-            return ErrorCode.MISSING_REQUIRED_VALUE;
-        }
-        if (RANGE_CONSTRAINTS.contains(constraint)) {
-            return ErrorCode.OUT_OF_RANGE;
-        }
-        return ErrorCode.INVALID_FORMAT;
-    }
-
     /**
-     * 위반한 제약 어노테이션 이름(예: NotBlank)을 꺼낸다.
-     * ConstraintViolation 으로 꺼낼 수 없으면 메시지 코드 목록의 마지막 값(예: "NotBlank")을 사용한다.
+     * 제약 이름 → 검증 에러 코드.
+     * 필수값(NotBlank, NotNull) → 필수값 누락, 범위(Positive) → 범위 오류, 그 외 → 형식 오류
      */
-    private String constraintName(ParameterValidationResult result, MessageSourceResolvable error) {
-        try {
-            ConstraintViolation<?> violation = result.unwrap(error, ConstraintViolation.class);
-            return violation.getConstraintDescriptor().getAnnotation().annotationType().getSimpleName();
-        } catch (IllegalArgumentException ignored) {
-            String[] codes = error.getCodes();
-            if (codes == null || codes.length == 0) {
-                return "";
-            }
-            String last = codes[codes.length - 1];
-            int dot = last.indexOf('.');
-            return dot < 0 ? last : last.substring(0, dot);
-        }
+    private ErrorCode classify(String constraint) {
+        return switch (constraint) {
+            case "NotBlank", "NotNull" -> ErrorCode.MISSING_REQUIRED_VALUE;
+            case "Positive" -> ErrorCode.OUT_OF_RANGE;
+            default -> ErrorCode.INVALID_FORMAT;
+        };
     }
 
     private ResponseEntity<ApiResponse<Void>> toValidationResponse(ErrorCode errorCode, String field) {

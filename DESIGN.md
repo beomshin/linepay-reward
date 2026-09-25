@@ -106,7 +106,7 @@
 
 ## 3. 요청값 검증과 코드 규칙 (교정 1)
 
-- **요청값 검증:** 컨트롤러 경로 변수에 Bean Validation 제약(`@NotBlank`, `@Size`, `@Pattern`, `@Positive`)을 선언했습니다. Spring MVC 내장 메서드 검증이 `HandlerMethodValidationException`을 던지면 전역 핸들러가 제약 종류에 따라 `MISSING_REQUIRED_VALUE` / `INVALID_FORMAT` / `OUT_OF_RANGE`(400)로 바꿉니다. 검증에 실패하면 서비스 로직까지 가지 않습니다.
+- **요청값 검증:** 컨트롤러 경로 변수에 Bean Validation 제약(`userId`·`missionId`는 `@NotBlank`, `participationId`는 `@NotNull`·`@Positive`)을 선언했습니다. `userId`·`missionId`에는 형식·길이 제한을 두지 않고, 존재하지 않는 값은 서비스의 존재 여부 확인에서 404로 거절합니다. Spring MVC 내장 메서드 검증이 `HandlerMethodValidationException`을 던지면 전역 핸들러가 제약 종류에 따라 `MISSING_REQUIRED_VALUE` / `INVALID_FORMAT` / `OUT_OF_RANGE`(400)로 바꿉니다. 검증에 실패하면 서비스 로직까지 가지 않습니다.
 - **에러 응답:** 모든 실패 응답은 `code` = 영문 사유 코드(ErrorCode enum 이름), `msg` = 한글 메시지입니다. HTTP 상태 코드는 그대로입니다.
 - **Lombok:** 엔티티는 `@Getter` + `@NoArgsConstructor(access = PROTECTED)`만 씁니다. `@Data`·`@Setter`는 쓰지 않아 상태 변경은 도메인 메서드(`grantPoint`, `markNoReward` 등)로만 합니다.
 - **의존성 주입:** 모든 빈이 `private final` 필드 + `@RequiredArgsConstructor` 생성자 주입을 씁니다.

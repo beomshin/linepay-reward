@@ -16,13 +16,13 @@
 | 경로 변수 | 규칙 | 위반 시 code |
 |---|---|---|
 | `userId`, `missionId` | 필수 (공백 불가) | MISSING_REQUIRED_VALUE |
-| `userId`, `missionId` | 영문 대소문자·숫자·`_`만 허용, 최대 50자 | INVALID_FORMAT |
 | `participationId` | 정수 | INVALID_FORMAT |
 | `participationId` | 1 이상 | OUT_OF_RANGE |
 
-- 한 값이 여러 규칙을 동시에 어기면 필수값 누락 → 범위 오류 → 형식 오류 순서로 하나만 응답합니다.
+- 검증에 걸린 항목이 여러 개면 첫 번째 항목 하나만 응답합니다.
 - 검증에 실패한 요청은 서비스 로직까지 전달되지 않습니다.
-- `userId;abc`처럼 세미콜론 뒤 값은 Spring MVC가 matrix variable로 보고 잘라낸 뒤 검증합니다.
+- `userId`, `missionId`에는 형식·길이 제한이 없습니다. 특수문자가 들어가거나 긴 값도 검증을 통과하고, 존재하지 않으면 `USER_NOT_FOUND` / `MISSION_NOT_FOUND`(404)로 응답합니다.
+- `userId;abc`처럼 세미콜론 뒤 값은 Spring MVC가 matrix variable로 보고 잘라냅니다.
 
 ### 1.2 응답 형식
 
@@ -92,7 +92,6 @@
 | HTTP | code | msg | 상황 |
 |---|---|---|---|
 | 400 | MISSING_REQUIRED_VALUE | 필수 요청값이 누락되었습니다. (userId) | `userId`가 공백 |
-| 400 | INVALID_FORMAT | 요청값 형식이 올바르지 않습니다. (userId) | `userId`에 영문·숫자·`_` 외 문자가 있거나 50자 초과 |
 | 404 | USER_NOT_FOUND | 사용자를 찾을 수 없습니다. | 존재하지 않는 사용자 |
 
 ---
@@ -122,9 +121,7 @@
 | HTTP | code | msg | 상황 |
 |---|---|---|---|
 | 400 | MISSING_REQUIRED_VALUE | 필수 요청값이 누락되었습니다. (userId) | `userId`가 공백 |
-| 400 | INVALID_FORMAT | 요청값 형식이 올바르지 않습니다. (userId) | `userId`에 영문·숫자·`_` 외 문자가 있거나 50자 초과 |
 | 400 | MISSING_REQUIRED_VALUE | 필수 요청값이 누락되었습니다. (missionId) | `missionId`가 공백 |
-| 400 | INVALID_FORMAT | 요청값 형식이 올바르지 않습니다. (missionId) | `missionId`에 영문·숫자·`_` 외 문자가 있거나 50자 초과 |
 | 404 | USER_NOT_FOUND | 사용자를 찾을 수 없습니다. | 존재하지 않는 사용자 |
 | 404 | MISSION_NOT_FOUND | 미션을 찾을 수 없습니다. | 존재하지 않는 미션 |
 | 409 | MISSION_NOT_IN_PERIOD | 미션 참여 가능 기간이 아닙니다. | `entry_start_at <= 현재 < entry_end_at` 불만족 |
@@ -212,7 +209,6 @@
 | HTTP | code | msg | 상황 |
 |---|---|---|---|
 | 400 | MISSING_REQUIRED_VALUE | 필수 요청값이 누락되었습니다. (userId) | `userId`가 공백 |
-| 400 | INVALID_FORMAT | 요청값 형식이 올바르지 않습니다. (userId) | `userId`에 영문·숫자·`_` 외 문자가 있거나 50자 초과 |
 | 400 | INVALID_FORMAT | 요청값 형식이 올바르지 않습니다. (participationId) | `participationId`가 정수가 아님 |
 | 400 | OUT_OF_RANGE | 요청값이 허용 범위를 벗어났습니다. (participationId) | `participationId`가 0 이하 |
 | 404 | USER_NOT_FOUND | 사용자를 찾을 수 없습니다. | 존재하지 않는 사용자 |
@@ -231,7 +227,6 @@
 | HTTP | code | msg | 상황 |
 |---|---|---|---|
 | 400 | MISSING_REQUIRED_VALUE | 필수 요청값이 누락되었습니다. (userId) | `userId`가 공백 |
-| 400 | INVALID_FORMAT | 요청값 형식이 올바르지 않습니다. (userId) | `userId`에 영문·숫자·`_` 외 문자가 있거나 50자 초과 |
 | 400 | INVALID_FORMAT | 요청값 형식이 올바르지 않습니다. (participationId) | `participationId`가 정수가 아님 |
 | 400 | OUT_OF_RANGE | 요청값이 허용 범위를 벗어났습니다. (participationId) | `participationId`가 0 이하 |
 | 404 | USER_NOT_FOUND | 사용자를 찾을 수 없습니다. | 존재하지 않는 사용자 |

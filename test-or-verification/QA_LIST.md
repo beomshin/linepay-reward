@@ -119,9 +119,9 @@
 |---|---|
 | QA-V01 | 공백 userId → 400 MISSING_REQUIRED_VALUE, 한글 메시지에 필드명 포함 |
 | QA-V02 | 공백 missionId → 400 MISSING_REQUIRED_VALUE, 참여 이력이 생기지 않음 |
-| QA-V03 | 허용되지 않은 문자(`-`, 공백, 한글, `@`, `.`)가 있는 userId → 400 INVALID_FORMAT (5건) |
-| QA-V04 | 50자 초과 userId → 400 INVALID_FORMAT |
-| QA-V05 | 형식이 틀린 missionId → 400 INVALID_FORMAT |
+| QA-V03 | 형식 제한 없음: 특수문자·공백·한글(`-`, 공백, 한글, `@`, `.`)이 있는 userId → 검증 통과 후 404 USER_NOT_FOUND (5건) |
+| QA-V04 | 길이 제한 없음: 50자 초과 userId → 검증 통과 후 404 USER_NOT_FOUND |
+| QA-V05 | 형식 제한 없음: 특수문자가 있는 missionId → 404 MISSION_NOT_FOUND, 참여 이력 생성 안 됨 |
 | QA-V06 | 숫자가 아닌 participationId(`abc`, `1.5`) → 400 INVALID_FORMAT |
 | QA-V07 | 0 이하 participationId(`0`, `-1`, `-9999`) → 400 OUT_OF_RANGE (요청·조회 모두, 3건) |
 | QA-V08 | Long 범위를 넘는 숫자 → 400 INVALID_FORMAT |

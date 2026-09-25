@@ -35,6 +35,9 @@
 |---|---|---|---|
 | 1회차 | 72/73 통과 | QA-V03의 `USER_0001;DROP`이 200으로 통과. Spring MVC가 `;` 뒤를 matrix variable로 보고 잘라내 `USER_0001`로 검증함 (검증 누락이 아니라 프레임워크 동작) | 테스트 값을 `USER@0001`, `USER.0001`로 바꾸고 이 동작을 api-spec.md 1.1에 기록 |
 | 2회차 | 73/73 통과 | - | - |
+| 3회차 | 66/73 통과 (QA-V03·V04·V05 7건 실패) | 컨트롤러에서 `userId`·`missionId`의 `@Size`·`@Pattern`을 빼고 `RequestIdRule`을 삭제하는 코드 변경이 있었음. 테스트는 이전 규칙(400 INVALID_FORMAT)을 기대하고 있어, 검증을 통과한 요청이 서비스에서 404로 거절되며 실패함 | 바뀐 규칙(필수값만 검증)에 맞춰 QA-V03~V05를 "검증 통과 → 404 USER_NOT_FOUND / MISSION_NOT_FOUND"로 수정 |
+| 4회차 | 73/73 통과 (전체 실행, 단독 실행 모두) | - | - |
+| 5회차 | 73/73 통과 | `HandlerMethodValidationException` 처리 단순화(우선순위 비교·ConstraintViolation 변환 제거) 후 재실행 | 검증 응답 코드·메시지 변화 없음 |
 
 ---
 

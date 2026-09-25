@@ -48,7 +48,7 @@ GET http://localhost:8080/linepay/v1/reward/USER_0001/abc
 ### [14] 필수값 누락(공백 userId) → 400 MISSING_REQUIRED_VALUE
 GET http://localhost:8080/linepay/v1/mission/%20
 
-### [15] 형식 오류(허용되지 않은 문자) → 400 INVALID_FORMAT
+### [15] userId 형식 제한 없음 → 검증 통과 후 404 USER_NOT_FOUND
 GET http://localhost:8080/linepay/v1/mission/USER-0001
 
 ### [16] 범위 오류(0 이하 participationId) → 400 OUT_OF_RANGE
