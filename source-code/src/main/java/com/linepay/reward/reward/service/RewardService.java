@@ -16,8 +16,8 @@ import com.linepay.reward.reward.domain.Reward;
 import com.linepay.reward.reward.dto.RewardResponse;
 import com.linepay.reward.reward.repository.RewardRepository;
 import com.linepay.reward.user.UserValidator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,10 +36,10 @@ import java.util.Optional;
  *     <li>지급 가능한 보상이 없으면 NO_REWARD 를 반환하고, 이후 재요청을 허용한다.</li>
  * </ul>
  */
+@Slf4j
+@RequiredArgsConstructor
 @Service
 public class RewardService {
-
-    private static final Logger log = LoggerFactory.getLogger(RewardService.class);
 
     private final MissionParticipationRepository participationRepository;
     private final MissionItemRepository missionItemRepository;
@@ -48,22 +48,6 @@ public class RewardService {
     private final RewardRandomizer randomizer;
     private final UserValidator userValidator;
     private final Clock clock;
-
-    public RewardService(MissionParticipationRepository participationRepository,
-                         MissionItemRepository missionItemRepository,
-                         RewardRepository rewardRepository,
-                         CouponClient couponClient,
-                         RewardRandomizer randomizer,
-                         UserValidator userValidator,
-                         Clock clock) {
-        this.participationRepository = participationRepository;
-        this.missionItemRepository = missionItemRepository;
-        this.rewardRepository = rewardRepository;
-        this.couponClient = couponClient;
-        this.randomizer = randomizer;
-        this.userValidator = userValidator;
-        this.clock = clock;
-    }
 
     /**
      * 보상 지급 요청.

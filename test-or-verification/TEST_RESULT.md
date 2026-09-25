@@ -1,5 +1,45 @@
 # 테스트 실행 결과
 
+## 0. 최신 실행 (교정 1 적용 후: Lombok · 생성자 주입 · Spring Validation)
+
+| 항목 | 값 |
+|---|---|
+| 실행일 | 2026-09-26 (KST) |
+| 명령 | `gradlew.bat clean test bootJar` |
+| 결과 | **73개 전체 통과** (기존 58 + 요청값 검증 15) |
+
+| 테스트 클래스 | QA | 테스트 수 | 실패 |
+|---|---|---:|---:|
+| `unit.KstTimeTest` | QA-T | 3 | 0 |
+| `unit.ParticipationPolicyTest` | QA-P | 8 | 0 |
+| `unit.FakeCouponSystemTest` | QA-C | 8 | 0 |
+| `integration.MissionServiceTest` | QA-M | 12 | 0 |
+| `integration.RewardServiceTest` | QA-R | 13 | 0 |
+| `integration.CouponIssueFallbackTest` | QA-F | 2 | 0 |
+| `integration.ConcurrencyTest` | QA-X | 4 | 0 |
+| `api.RewardApiTest` | QA-A | 8 | 0 |
+| `api.RequestValidationApiTest` | QA-V | 15 | 0 |
+| **합계** | | **73** | **0** |
+
+교정 1 완료 조건 확인
+
+| 완료 조건 | 결과 |
+|---|---|
+| 기존 테스트 통과 | 기존 58개 모두 통과. 에러 응답 형식 변경(`code`=영문 사유 코드, `msg`=한글)에 맞춰 `RewardApiTest`의 기대값만 수정 |
+| 필수값 누락·형식 오류·범위 오류 → 400 + 정의된 코드·메시지 | QA-V01~V09 통과. 실제 서버에서도 `MISSING_REQUIRED_VALUE` / `INVALID_FORMAT` / `OUT_OF_RANGE` 응답과 한글 메시지 확인 |
+| 애플리케이션 기동 시 빈 주입 오류 없음 | `java -jar`로 기동: `Started LinepayRewardApplication in 5.9 seconds`, 빈 생성·주입 오류 로그 없음 |
+
+실행 중 발견한 사항
+
+| 회차 | 결과 | 원인 | 조치 |
+|---|---|---|---|
+| 1회차 | 72/73 통과 | QA-V03의 `USER_0001;DROP`이 200으로 통과. Spring MVC가 `;` 뒤를 matrix variable로 보고 잘라내 `USER_0001`로 검증함 (검증 누락이 아니라 프레임워크 동작) | 테스트 값을 `USER@0001`, `USER.0001`로 바꾸고 이 동작을 api-spec.md 1.1에 기록 |
+| 2회차 | 73/73 통과 | - | - |
+
+---
+
+## 이전 실행 기록 (초기 구현)
+
 ## 1. 실행 환경
 
 | 항목 | 값 |

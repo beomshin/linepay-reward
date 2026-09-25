@@ -7,12 +7,15 @@
 | 항목 | 내용 |
 |---|---|
 | JDK | **Java 21** (21.0.10에서 검증) |
-| Framework | Spring Boot 3.5.16 (spring-boot-starter-web, spring-boot-starter-data-jpa) |
+| Framework | Spring Boot 3.5.16 (spring-boot-starter-web, spring-boot-starter-data-jpa, spring-boot-starter-validation) |
 | Build | Gradle 8.14.3 (Gradle Wrapper 포함) |
 | Database | H2 In-memory |
 | Test | JUnit 5 (spring-boot-starter-test) |
+| 코드 간소화 | Lombok (Spring Boot 관리 버전, 컴파일 시점에만 사용) |
 
-그 밖의 외부 라이브러리는 추가하지 않았습니다.
+- Lombok: 엔티티 Getter·기본 생성자, `@RequiredArgsConstructor` 생성자 주입, `@Slf4j` 로거 (엔티티에 `@Data`·`@Setter`는 쓰지 않음)
+- Spring Validation: 경로 변수(`userId`, `missionId`, `participationId`) 검증
+- IntelliJ에서 열 때는 Lombok 플러그인과 Annotation Processing이 켜져 있어야 합니다. (Gradle 빌드/테스트는 설정 없이 동작)
 
 ## 2. 프로젝트 구조
 
@@ -89,6 +92,7 @@ linepay:
 
 - 미션 참여: 참여 기간(`start <= now < end`), 미션 전체 최대 100회, 사용자별 하루(KST) 최대 10회, 직전 참여 후 1시간 경과
 - 보상: 참여 이력 1건당 보상 1회, 보상 아이템 중 무작위 선택, 포인트 5~10 무작위, 쿠폰은 한도 소진·발급 중지 시 제외, 지급 가능한 보상이 없으면 `NO_REWARD` 반환 후 재요청 허용
+- 요청값 검증: 필수값 누락·형식 오류·범위 오류를 400과 영문 코드(`MISSING_REQUIRED_VALUE`/`INVALID_FORMAT`/`OUT_OF_RANGE`) + 한글 메시지로 응답
 - 반복·동시 요청: 미션 단위(완료 처리), 참여 이력 단위(보상 지급)로 DB 비관적 락을 걸어 정책이 깨지지 않도록 처리
 - 외부 쿠폰 시스템: `CouponClient` 계약 + `FakeCouponSystem` 재현체 (멱등 requestId, 한도 소진, 유효하지 않은 템플릿, 404)
 

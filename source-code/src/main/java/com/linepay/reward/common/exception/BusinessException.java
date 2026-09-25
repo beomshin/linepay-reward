@@ -1,9 +1,12 @@
 package com.linepay.reward.common.exception;
 
+import lombok.Getter;
+
 /**
  * 비즈니스 규칙 위반 시 던지는 예외.
  * 전역 예외 핸들러에서 {@link ErrorCode} 에 맞는 HTTP 상태와 응답으로 변환된다.
  */
+@Getter
 public class BusinessException extends RuntimeException {
 
     private final ErrorCode errorCode;
@@ -16,9 +19,5 @@ public class BusinessException extends RuntimeException {
     public BusinessException(ErrorCode errorCode, Throwable cause) {
         super(errorCode.name(), cause);
         this.errorCode = errorCode;
-    }
-
-    public ErrorCode getErrorCode() {
-        return errorCode;
     }
 }

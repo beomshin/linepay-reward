@@ -88,12 +88,12 @@ class RewardApiTest extends IntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("QA-A03 404: 존재하지 않는 사용자/미션/참여 이력 → code=E404, data=null")
+    @DisplayName("QA-A03 404: 존재하지 않는 사용자/미션/참여 이력 → code=영문 사유 코드, msg=한글, data=null")
     void notFoundErrors() throws Exception {
         MvcResult userNotFound = mockMvc.perform(get("/linepay/v1/mission/NO_USER"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("E404"))
-                .andExpect(jsonPath("$.msg").value("USER_NOT_FOUND"))
+                .andExpect(jsonPath("$.code").value("USER_NOT_FOUND"))
+                .andExpect(jsonPath("$.msg").value("사용자를 찾을 수 없습니다."))
                 .andExpect(jsonPath("$.data").value(nullValue()))
                 .andReturn();
         // data 필드가 생략되지 않고 null 로 명시되어야 한다
@@ -103,20 +103,20 @@ class RewardApiTest extends IntegrationTestSupport {
 
         mockMvc.perform(post("/linepay/v1/mission/USER_0001/MISSION_9999/complete"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.msg").value("MISSION_NOT_FOUND"));
+                .andExpect(jsonPath("$.code").value("MISSION_NOT_FOUND"));
 
         mockMvc.perform(post("/linepay/v1/reward/USER_0001/999999"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.msg").value("PARTICIPATION_NOT_FOUND"));
+                .andExpect(jsonPath("$.code").value("PARTICIPATION_NOT_FOUND"));
     }
 
     @Test
-    @DisplayName("QA-A04 409: 기간 외 미션·재참여 제한·중복 보상 → code=E409")
+    @DisplayName("QA-A04 409: 기간 외 미션·재참여 제한·중복 보상 → 409")
     void conflictErrors() throws Exception {
         mockMvc.perform(post("/linepay/v1/mission/USER_0001/MISSION_0001/complete"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("E409"))
-                .andExpect(jsonPath("$.msg").value("MISSION_NOT_IN_PERIOD"))
+                .andExpect(jsonPath("$.code").value("MISSION_NOT_IN_PERIOD"))
+                .andExpect(jsonPath("$.msg").value("미션 참여 가능 기간이 아닙니다."))
                 .andExpect(jsonPath("$.data").value(nullValue()));
 
         MvcResult completed = mockMvc.perform(post("/linepay/v1/mission/USER_0001/MISSION_0003/complete")).andReturn();
@@ -124,12 +124,12 @@ class RewardApiTest extends IntegrationTestSupport {
 
         mockMvc.perform(post("/linepay/v1/mission/USER_0001/MISSION_0003/complete"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.msg").value("MISSION_REENTRY_COOLDOWN"));
+                .andExpect(jsonPath("$.code").value("MISSION_REENTRY_COOLDOWN"));
 
         mockMvc.perform(post("/linepay/v1/reward/USER_0001/" + participationId)).andExpect(status().isOk());
         mockMvc.perform(post("/linepay/v1/reward/USER_0001/" + participationId))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.msg").value("REWARD_ALREADY_GRANTED"));
+                .andExpect(jsonPath("$.code").value("REWARD_ALREADY_GRANTED"));
     }
 
     @Test
@@ -140,16 +140,16 @@ class RewardApiTest extends IntegrationTestSupport {
 
         mockMvc.perform(get("/linepay/v1/reward/USER_0001/" + participationId))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.msg").value("REWARD_NOT_FOUND"));
+                .andExpect(jsonPath("$.code").value("REWARD_NOT_FOUND"));
     }
 
     @Test
-    @DisplayName("QA-A06 400: participationId 형식 오류 → E400 INVALID_REQUEST")
+    @DisplayName("QA-A06 400: participationId 형식 오류 → INVALID_FORMAT")
     void badRequest() throws Exception {
         mockMvc.perform(post("/linepay/v1/reward/USER_0001/abc"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("E400"))
-                .andExpect(jsonPath("$.msg").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.code").value("INVALID_FORMAT"))
+                .andExpect(jsonPath("$.msg").value("요청값 형식이 올바르지 않습니다. (participationId)"))
                 .andExpect(jsonPath("$.data").value(nullValue()));
     }
 
@@ -158,11 +158,11 @@ class RewardApiTest extends IntegrationTestSupport {
     void unknownPathAndMethod() throws Exception {
         mockMvc.perform(get("/linepay/v2/mission/USER_0001"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.msg").value("API_NOT_FOUND"));
+                .andExpect(jsonPath("$.code").value("API_NOT_FOUND"));
 
         mockMvc.perform(get("/linepay/v1/mission/USER_0001/MISSION_0002/complete"))
                 .andExpect(status().isMethodNotAllowed())
-                .andExpect(jsonPath("$.code").value("E405"))
+                .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"))
                 .andExpect(jsonPath("$.data").value(nullValue()));
     }
 

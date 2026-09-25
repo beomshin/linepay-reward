@@ -8,6 +8,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
@@ -18,6 +21,8 @@ import java.time.LocalDateTime;
  * 보상 지급 요청은 이 참여 이력 하나를 대상으로 한다.
  * 참여 시각(= 완료 요청이 받아들여진 시각)은 재참여 가능 시점 판단의 기준이 된다.
  */
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "mission_participation", indexes = {
         @Index(name = "idx_participation_mission_user_date", columnList = "mission_id, user_id, participated_date")
@@ -43,9 +48,6 @@ public class MissionParticipation {
     @Column(name = "participated_time", nullable = false, length = 6)
     private String participatedTime;
 
-    protected MissionParticipation() {
-    }
-
     public MissionParticipation(String missionId, String userId, LocalDateTime participatedAt) {
         this.missionId = missionId;
         this.userId = userId;
@@ -59,25 +61,5 @@ public class MissionParticipation {
 
     public boolean isOwnedBy(String userId) {
         return this.userId.equals(userId);
-    }
-
-    public Long getParticipationId() {
-        return participationId;
-    }
-
-    public String getMissionId() {
-        return missionId;
-    }
-
-    public String getUserId() {
-        return userId;
-    }
-
-    public String getParticipatedDate() {
-        return participatedDate;
-    }
-
-    public String getParticipatedTime() {
-        return participatedTime;
     }
 }

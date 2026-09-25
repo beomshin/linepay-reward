@@ -13,6 +13,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
@@ -26,6 +29,8 @@ import java.time.LocalDateTime;
  * </ul>
  * 리워드 포인트는 서비스 내부에서 관리하므로 지급 금액을 이 테이블에 기록한다.
  */
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "reward", uniqueConstraints = @UniqueConstraint(name = "uk_reward_participation", columnNames = "participation_id"))
 public class Reward {
@@ -78,9 +83,6 @@ public class Reward {
     /** 최근 처리 시간 (HHmmss, KST) */
     @Column(name = "processed_time", nullable = false, length = 6)
     private String processedTime;
-
-    protected Reward() {
-    }
 
     private Reward(MissionParticipation participation) {
         this.participationId = participation.getParticipationId();
@@ -137,57 +139,5 @@ public class Reward {
     private void touch(LocalDateTime now) {
         this.processedDate = KstTime.toDate(now);
         this.processedTime = KstTime.toTime(now);
-    }
-
-    public Long getRewardId() {
-        return rewardId;
-    }
-
-    public Long getParticipationId() {
-        return participationId;
-    }
-
-    public String getMissionId() {
-        return missionId;
-    }
-
-    public String getUserId() {
-        return userId;
-    }
-
-    public RewardStatus getRewardStatus() {
-        return rewardStatus;
-    }
-
-    public String getMissionItemId() {
-        return missionItemId;
-    }
-
-    public ItemType getItemType() {
-        return itemType;
-    }
-
-    public Integer getPointAmount() {
-        return pointAmount;
-    }
-
-    public String getCouponTemplateId() {
-        return couponTemplateId;
-    }
-
-    public String getCouponId() {
-        return couponId;
-    }
-
-    public String getCouponRequestId() {
-        return couponRequestId;
-    }
-
-    public String getProcessedDate() {
-        return processedDate;
-    }
-
-    public String getProcessedTime() {
-        return processedTime;
     }
 }

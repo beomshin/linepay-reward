@@ -5,7 +5,8 @@
  *  - 애플리케이션 코드 : source-code/src/main
  *  - 자동화 테스트 코드 : test-or-verification/src/test
  *
- * 사용 기술: Java 21, Spring Boot, Gradle, H2, JUnit5 (그 외 의존성 추가 없음)
+ * 사용 기술: Java 21, Spring Boot, Gradle, H2, JUnit5
+ *           + Lombok(반복 코드 제거), Spring Validation(요청값 검증)  ← 교정 1
  */
 plugins {
     id 'java'
@@ -40,7 +41,15 @@ sourceSets {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    // 요청값 선언적 검증 (Bean Validation)
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
     runtimeOnly 'com.h2database:h2'
+
+    // Lombok: Getter·생성자 등 반복 코드 제거 (컴파일 시점에만 사용)
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
 
     // JUnit5 기반 테스트 (spring-boot-starter-test 에 JUnit Jupiter 포함)
     testImplementation 'org.springframework.boot:spring-boot-starter-test'

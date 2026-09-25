@@ -13,6 +13,7 @@
 | QA-F | `integration/CouponIssueFallbackTest` | 통합 (외부 오류 주입) |
 | QA-X | `integration/ConcurrencyTest` | 통합 (동시성) |
 | QA-A | `api/RewardApiTest` | API (MockMvc) |
+| QA-V | `api/RequestValidationApiTest` | API (MockMvc, 요청값 검증) |
 
 ## 1. 시간 기준 (과제 9절, 프롬프트 9절)
 
@@ -105,14 +106,28 @@
 |---|---|
 | QA-A01 | 비즈니스 시나리오 1~5단계를 API로 끝까지 실행 |
 | QA-A02 | Content-Type `application/json;charset=UTF-8` |
-| QA-A03 | 404 응답 `code=E404`, `msg`, `data: null` (data 키가 있어야 함) |
+| QA-A03 | 404 응답 `code`=영문 사유 코드, `msg`=한글 메시지, `data: null` (data 키가 있어야 함) |
 | QA-A04 | 409 응답 (기간 외, 재참여 제한, 중복 보상) |
 | QA-A05 | 보상 요청 전 조회 → 404 REWARD_NOT_FOUND |
-| QA-A06 | 경로 변수 형식 오류 → 400 INVALID_REQUEST |
+| QA-A06 | 경로 변수 형식 오류 → 400 INVALID_FORMAT |
 | QA-A07 | 정의되지 않은 경로(404), 허용되지 않은 메서드(405)도 공통 포맷 |
 | QA-A08 | NO_REWARD는 200 정상 응답 |
 
-## 9. 검증하지 못한 범위
+## 9. 요청값 검증 (교정 1: Spring Validation)
+
+| ID | 검증 항목 |
+|---|---|
+| QA-V01 | 공백 userId → 400 MISSING_REQUIRED_VALUE, 한글 메시지에 필드명 포함 |
+| QA-V02 | 공백 missionId → 400 MISSING_REQUIRED_VALUE, 참여 이력이 생기지 않음 |
+| QA-V03 | 허용되지 않은 문자(`-`, 공백, 한글, `@`, `.`)가 있는 userId → 400 INVALID_FORMAT (5건) |
+| QA-V04 | 50자 초과 userId → 400 INVALID_FORMAT |
+| QA-V05 | 형식이 틀린 missionId → 400 INVALID_FORMAT |
+| QA-V06 | 숫자가 아닌 participationId(`abc`, `1.5`) → 400 INVALID_FORMAT |
+| QA-V07 | 0 이하 participationId(`0`, `-1`, `-9999`) → 400 OUT_OF_RANGE (요청·조회 모두, 3건) |
+| QA-V08 | Long 범위를 넘는 숫자 → 400 INVALID_FORMAT |
+| QA-V09 | 형식이 맞는 값은 기존 비즈니스 검증으로 이어짐 (없는 사용자 → 404 USER_NOT_FOUND) |
+
+## 10. 검증하지 못한 범위
 
 - 여러 애플리케이션 인스턴스와 공유 DB 환경에서의 동시성 (단일 JVM, H2에서만 검증)
 - 실제 HTTP 외부 쿠폰 시스템의 타임아웃·네트워크 오류 (재현체에서는 예외 주입으로만 확인)

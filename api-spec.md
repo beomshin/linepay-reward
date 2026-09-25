@@ -11,7 +11,20 @@
 | 사용자 식별 | PathVariable `{userId}` (인증 없음, 과제 11절) |
 | 시간 표기 | KST 기준, 일자 `yyyyMMdd` / 시간 `HHmmss` 필드 분리 |
 
-### 1.1 응답 형식
+### 1.1 요청값 검증 (Spring Validation)
+
+| 경로 변수 | 규칙 | 위반 시 code |
+|---|---|---|
+| `userId`, `missionId` | 필수 (공백 불가) | MISSING_REQUIRED_VALUE |
+| `userId`, `missionId` | 영문 대소문자·숫자·`_`만 허용, 최대 50자 | INVALID_FORMAT |
+| `participationId` | 정수 | INVALID_FORMAT |
+| `participationId` | 1 이상 | OUT_OF_RANGE |
+
+- 한 값이 여러 규칙을 동시에 어기면 필수값 누락 → 범위 오류 → 형식 오류 순서로 하나만 응답합니다.
+- 검증에 실패한 요청은 서비스 로직까지 전달되지 않습니다.
+- `userId;abc`처럼 세미콜론 뒤 값은 Spring MVC가 matrix variable로 보고 잘라낸 뒤 검증합니다.
+
+### 1.2 응답 형식
 
 모든 응답은 `code`, `msg`, `data`를 포함합니다. 실패 응답의 `data`는 `null`입니다.
 
@@ -20,11 +33,12 @@
 ```
 
 ```json
-{ "code": "E404", "msg": "MISSION_NOT_FOUND", "data": null }
+{ "code": "MISSION_NOT_FOUND", "msg": "미션을 찾을 수 없습니다.", "data": null }
 ```
 
 - 성공: `code = "0000"`, `msg = "SUCCESS"`
-- 실패: `code = "E" + HTTP 상태 코드`, `msg = ErrorCode enum 이름`
+- 실패: `code` = 영문 사유 코드(ErrorCode enum 이름), `msg` = 한글 메시지
+- 요청값 검증 실패 시 `msg` 끝에 문제가 된 필드명을 붙입니다. (예: `"요청값 형식이 올바르지 않습니다. (participationId)"`)
 
 ## 2. API 목록
 
@@ -77,7 +91,9 @@
 
 | HTTP | code | msg | 상황 |
 |---|---|---|---|
-| 404 | E404 | USER_NOT_FOUND | 존재하지 않는 사용자 |
+| 400 | MISSING_REQUIRED_VALUE | 필수 요청값이 누락되었습니다. (userId) | `userId`가 공백 |
+| 400 | INVALID_FORMAT | 요청값 형식이 올바르지 않습니다. (userId) | `userId`에 영문·숫자·`_` 외 문자가 있거나 50자 초과 |
+| 404 | USER_NOT_FOUND | 사용자를 찾을 수 없습니다. | 존재하지 않는 사용자 |
 
 ---
 
@@ -105,12 +121,16 @@
 
 | HTTP | code | msg | 상황 |
 |---|---|---|---|
-| 404 | E404 | USER_NOT_FOUND | 존재하지 않는 사용자 |
-| 404 | E404 | MISSION_NOT_FOUND | 존재하지 않는 미션 |
-| 409 | E409 | MISSION_NOT_IN_PERIOD | `entry_start_at <= 현재 < entry_end_at` 불만족 |
-| 409 | E409 | MISSION_TOTAL_LIMIT_EXCEEDED | 미션 전체 참여 100회 도달 |
-| 409 | E409 | MISSION_DAILY_LIMIT_EXCEEDED | 사용자의 같은 미션 당일(KST) 참여 10회 도달 |
-| 409 | E409 | MISSION_REENTRY_COOLDOWN | 직전 참여 후 1시간 미경과 |
+| 400 | MISSING_REQUIRED_VALUE | 필수 요청값이 누락되었습니다. (userId) | `userId`가 공백 |
+| 400 | INVALID_FORMAT | 요청값 형식이 올바르지 않습니다. (userId) | `userId`에 영문·숫자·`_` 외 문자가 있거나 50자 초과 |
+| 400 | MISSING_REQUIRED_VALUE | 필수 요청값이 누락되었습니다. (missionId) | `missionId`가 공백 |
+| 400 | INVALID_FORMAT | 요청값 형식이 올바르지 않습니다. (missionId) | `missionId`에 영문·숫자·`_` 외 문자가 있거나 50자 초과 |
+| 404 | USER_NOT_FOUND | 사용자를 찾을 수 없습니다. | 존재하지 않는 사용자 |
+| 404 | MISSION_NOT_FOUND | 미션을 찾을 수 없습니다. | 존재하지 않는 미션 |
+| 409 | MISSION_NOT_IN_PERIOD | 미션 참여 가능 기간이 아닙니다. | `entry_start_at <= 현재 < entry_end_at` 불만족 |
+| 409 | MISSION_TOTAL_LIMIT_EXCEEDED | 미션 전체 참여 횟수를 초과했습니다. | 미션 전체 참여 100회 도달 |
+| 409 | MISSION_DAILY_LIMIT_EXCEEDED | 오늘 이 미션에 참여할 수 있는 횟수를 모두 사용했습니다. | 사용자의 같은 미션 당일(KST) 참여 10회 도달 |
+| 409 | MISSION_REENTRY_COOLDOWN | 직전 참여 후 1시간이 지나야 다시 참여할 수 있습니다. | 직전 참여 후 1시간 미경과 |
 
 > 여러 조건을 동시에 위반하면 기간 → 전체 횟수 → 일별 횟수 → 재참여 간격 순서로 첫 번째 사유를 반환합니다.
 
@@ -191,11 +211,14 @@
 
 | HTTP | code | msg | 상황 |
 |---|---|---|---|
-| 400 | E400 | INVALID_REQUEST | `participationId`가 숫자가 아님 |
-| 404 | E404 | USER_NOT_FOUND | 존재하지 않는 사용자 |
-| 404 | E404 | PARTICIPATION_NOT_FOUND | 참여 이력이 없거나 요청 사용자의 이력이 아님 |
-| 409 | E409 | REWARD_ALREADY_GRANTED | 이미 보상이 지급된 참여 이력 |
-| 500 | E500 | COUPON_SYSTEM_ERROR | 외부 쿠폰 시스템이 예상하지 못한 결과 반환 |
+| 400 | MISSING_REQUIRED_VALUE | 필수 요청값이 누락되었습니다. (userId) | `userId`가 공백 |
+| 400 | INVALID_FORMAT | 요청값 형식이 올바르지 않습니다. (userId) | `userId`에 영문·숫자·`_` 외 문자가 있거나 50자 초과 |
+| 400 | INVALID_FORMAT | 요청값 형식이 올바르지 않습니다. (participationId) | `participationId`가 정수가 아님 |
+| 400 | OUT_OF_RANGE | 요청값이 허용 범위를 벗어났습니다. (participationId) | `participationId`가 0 이하 |
+| 404 | USER_NOT_FOUND | 사용자를 찾을 수 없습니다. | 존재하지 않는 사용자 |
+| 404 | PARTICIPATION_NOT_FOUND | 미션 참여 이력을 찾을 수 없습니다. | 참여 이력이 없거나 요청 사용자의 이력이 아님 |
+| 409 | REWARD_ALREADY_GRANTED | 이미 보상이 지급된 미션 참여입니다. | 이미 보상이 지급된 참여 이력 |
+| 500 | COUPON_SYSTEM_ERROR | 쿠폰 발급 처리 중 오류가 발생했습니다. | 외부 쿠폰 시스템이 예상하지 못한 결과 반환 |
 
 ---
 
@@ -207,20 +230,34 @@
 
 | HTTP | code | msg | 상황 |
 |---|---|---|---|
-| 400 | E400 | INVALID_REQUEST | `participationId`가 숫자가 아님 |
-| 404 | E404 | USER_NOT_FOUND | 존재하지 않는 사용자 |
-| 404 | E404 | PARTICIPATION_NOT_FOUND | 참여 이력이 없거나 요청 사용자의 이력이 아님 |
-| 404 | E404 | REWARD_NOT_FOUND | 아직 보상 지급 요청을 하지 않은 참여 이력 |
+| 400 | MISSING_REQUIRED_VALUE | 필수 요청값이 누락되었습니다. (userId) | `userId`가 공백 |
+| 400 | INVALID_FORMAT | 요청값 형식이 올바르지 않습니다. (userId) | `userId`에 영문·숫자·`_` 외 문자가 있거나 50자 초과 |
+| 400 | INVALID_FORMAT | 요청값 형식이 올바르지 않습니다. (participationId) | `participationId`가 정수가 아님 |
+| 400 | OUT_OF_RANGE | 요청값이 허용 범위를 벗어났습니다. (participationId) | `participationId`가 0 이하 |
+| 404 | USER_NOT_FOUND | 사용자를 찾을 수 없습니다. | 존재하지 않는 사용자 |
+| 404 | PARTICIPATION_NOT_FOUND | 미션 참여 이력을 찾을 수 없습니다. | 참여 이력이 없거나 요청 사용자의 이력이 아님 |
+| 404 | REWARD_NOT_FOUND | 보상 지급 요청 이력이 없습니다. | 아직 보상 지급 요청을 하지 않은 참여 이력 |
 
 ## 3. 에러 코드 전체 목록
 
 | HTTP | code | msg |
 |---|---|---|
-| 400 | E400 | INVALID_REQUEST |
-| 404 | E404 | USER_NOT_FOUND / MISSION_NOT_FOUND / PARTICIPATION_NOT_FOUND / REWARD_NOT_FOUND / API_NOT_FOUND |
-| 405 | E405 | METHOD_NOT_ALLOWED |
-| 409 | E409 | MISSION_NOT_IN_PERIOD / MISSION_TOTAL_LIMIT_EXCEEDED / MISSION_DAILY_LIMIT_EXCEEDED / MISSION_REENTRY_COOLDOWN / REWARD_ALREADY_GRANTED |
-| 500 | E500 | COUPON_SYSTEM_ERROR / INTERNAL_SERVER_ERROR |
+| 400 | MISSING_REQUIRED_VALUE | 필수 요청값이 누락되었습니다. |
+| 400 | INVALID_FORMAT | 요청값 형식이 올바르지 않습니다. |
+| 400 | OUT_OF_RANGE | 요청값이 허용 범위를 벗어났습니다. |
+| 404 | USER_NOT_FOUND | 사용자를 찾을 수 없습니다. |
+| 404 | MISSION_NOT_FOUND | 미션을 찾을 수 없습니다. |
+| 404 | PARTICIPATION_NOT_FOUND | 미션 참여 이력을 찾을 수 없습니다. |
+| 404 | REWARD_NOT_FOUND | 보상 지급 요청 이력이 없습니다. |
+| 404 | API_NOT_FOUND | 요청한 API를 찾을 수 없습니다. |
+| 405 | METHOD_NOT_ALLOWED | 지원하지 않는 HTTP 메서드입니다. |
+| 409 | MISSION_NOT_IN_PERIOD | 미션 참여 가능 기간이 아닙니다. |
+| 409 | MISSION_TOTAL_LIMIT_EXCEEDED | 미션 전체 참여 횟수를 초과했습니다. |
+| 409 | MISSION_DAILY_LIMIT_EXCEEDED | 오늘 이 미션에 참여할 수 있는 횟수를 모두 사용했습니다. |
+| 409 | MISSION_REENTRY_COOLDOWN | 직전 참여 후 1시간이 지나야 다시 참여할 수 있습니다. |
+| 409 | REWARD_ALREADY_GRANTED | 이미 보상이 지급된 미션 참여입니다. |
+| 500 | COUPON_SYSTEM_ERROR | 쿠폰 발급 처리 중 오류가 발생했습니다. |
+| 500 | INTERNAL_SERVER_ERROR | 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요. |
 
 에러 코드는 `ErrorCode` enum으로 정의하고, `GlobalExceptionHandler`(`@RestControllerAdvice`)에서 한 번에 처리합니다.
 

@@ -1,0 +1,126 @@
+package com.linepay.reward.api;
+
+import com.linepay.reward.support.IntegrationTestSupport;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * 요청값 검증 (교정 1: Spring Validation)
+ * - 필수값 누락 → 400 MISSING_REQUIRED_VALUE
+ * - 형식 오류   → 400 INVALID_FORMAT
+ * - 범위 오류   → 400 OUT_OF_RANGE
+ * 모든 응답은 영문 코드 + 한글 메시지 + data=null 이며, 검증 실패 시 서비스 로직까지 전달되지 않는다.
+ */
+@AutoConfigureMockMvc
+@DisplayName("[QA-V] 요청값 검증 (Spring Validation)")
+class RequestValidationApiTest extends IntegrationTestSupport {
+
+    private static final String TOO_LONG_ID = "U".repeat(51);
+
+    @Autowired
+    MockMvc mockMvc;
+
+    @Test
+    @DisplayName("QA-V01 필수값 누락: 공백 userId → 400 MISSING_REQUIRED_VALUE")
+    void missingUserId() throws Exception {
+        mockMvc.perform(get("/linepay/v1/mission/{userId}", " "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MISSING_REQUIRED_VALUE"))
+                .andExpect(jsonPath("$.msg").value("필수 요청값이 누락되었습니다. (userId)"))
+                .andExpect(jsonPath("$.data").value(nullValue()));
+    }
+
+    @Test
+    @DisplayName("QA-V02 필수값 누락: 공백 missionId → 400 MISSING_REQUIRED_VALUE, 참여 이력 생성 안 됨")
+    void missingMissionId() throws Exception {
+        mockMvc.perform(post("/linepay/v1/mission/USER_0001/{missionId}/complete", " "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MISSING_REQUIRED_VALUE"))
+                .andExpect(jsonPath("$.msg").value("필수 요청값이 누락되었습니다. (missionId)"));
+
+        assertThat(participationRepository.count()).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"USER-0001", "USER 0001", "유저0001", "USER@0001", "USER.0001"})
+    @DisplayName("QA-V03 형식 오류: 허용되지 않은 문자가 포함된 userId → 400 INVALID_FORMAT")
+    void invalidUserIdFormat(String userId) throws Exception {
+        mockMvc.perform(get("/linepay/v1/mission/{userId}", userId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_FORMAT"))
+                .andExpect(jsonPath("$.msg").value("요청값 형식이 올바르지 않습니다. (userId)"))
+                .andExpect(jsonPath("$.data").value(nullValue()));
+    }
+
+    @Test
+    @DisplayName("QA-V04 형식 오류: 50자를 넘는 userId → 400 INVALID_FORMAT")
+    void tooLongUserId() throws Exception {
+        mockMvc.perform(post("/linepay/v1/reward/{userId}/1", TOO_LONG_ID))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_FORMAT"))
+                .andExpect(jsonPath("$.msg").value("요청값 형식이 올바르지 않습니다. (userId)"));
+    }
+
+    @Test
+    @DisplayName("QA-V05 형식 오류: 허용되지 않은 문자가 포함된 missionId → 400 INVALID_FORMAT")
+    void invalidMissionIdFormat() throws Exception {
+        mockMvc.perform(post("/linepay/v1/mission/USER_0001/{missionId}/complete", "MISSION-0002"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_FORMAT"))
+                .andExpect(jsonPath("$.msg").value("요청값 형식이 올바르지 않습니다. (missionId)"));
+    }
+
+    @Test
+    @DisplayName("QA-V06 형식 오류: 숫자가 아닌 participationId → 400 INVALID_FORMAT (보상 요청·조회)")
+    void participationIdNotNumber() throws Exception {
+        mockMvc.perform(post("/linepay/v1/reward/USER_0001/abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_FORMAT"))
+                .andExpect(jsonPath("$.msg").value("요청값 형식이 올바르지 않습니다. (participationId)"));
+        mockMvc.perform(get("/linepay/v1/reward/USER_0001/1.5"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_FORMAT"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "-1", "-9999"})
+    @DisplayName("QA-V07 범위 오류: 0 이하 participationId → 400 OUT_OF_RANGE")
+    void participationIdOutOfRange(String participationId) throws Exception {
+        mockMvc.perform(post("/linepay/v1/reward/USER_0001/{participationId}", participationId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("OUT_OF_RANGE"))
+                .andExpect(jsonPath("$.msg").value("요청값이 허용 범위를 벗어났습니다. (participationId)"))
+                .andExpect(jsonPath("$.data").value(nullValue()));
+        mockMvc.perform(get("/linepay/v1/reward/USER_0001/{participationId}", participationId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("OUT_OF_RANGE"));
+    }
+
+    @Test
+    @DisplayName("QA-V08 형식 오류: Long 범위를 넘는 숫자 participationId → 400 INVALID_FORMAT")
+    void participationIdOverflow() throws Exception {
+        mockMvc.perform(get("/linepay/v1/reward/USER_0001/99999999999999999999"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_FORMAT"));
+    }
+
+    @Test
+    @DisplayName("QA-V09 검증을 통과한 정상 형식 값은 기존 비즈니스 검증으로 이어진다 (없는 사용자 → 404)")
+    void validFormatReachesService() throws Exception {
+        mockMvc.perform(get("/linepay/v1/mission/USER_9999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("USER_NOT_FOUND"));
+    }
+}

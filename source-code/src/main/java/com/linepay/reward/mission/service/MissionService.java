@@ -11,6 +11,7 @@ import com.linepay.reward.mission.dto.ParticipationResponse;
 import com.linepay.reward.mission.repository.MissionParticipationRepository;
 import com.linepay.reward.mission.repository.MissionRepository;
 import com.linepay.reward.user.UserValidator;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,7 @@ import java.util.Optional;
  *     <li>미션 수행 완료 처리 → 미션 참여 이력 생성 (과제 6.1, 6.2)</li>
  * </ul>
  */
+@RequiredArgsConstructor
 @Service
 public class MissionService {
 
@@ -33,16 +35,6 @@ public class MissionService {
     private final MissionParticipationRepository participationRepository;
     private final UserValidator userValidator;
     private final Clock clock;
-
-    public MissionService(MissionRepository missionRepository,
-                          MissionParticipationRepository participationRepository,
-                          UserValidator userValidator,
-                          Clock clock) {
-        this.missionRepository = missionRepository;
-        this.participationRepository = participationRepository;
-        this.userValidator = userValidator;
-        this.clock = clock;
-    }
 
     /**
      * 조회 시점에 해당 사용자가 실제로 참여할 수 있는 미션만 반환한다.

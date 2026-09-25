@@ -22,7 +22,7 @@
 
 | 패키지 | 역할 |
 |---|---|
-| `common.response` | 공통 응답 `{code, msg, data}` |
+| `common.response` | 공통 응답 `{code, msg, data}` (실패 시 code=영문 사유 코드, msg=한글 메시지) |
 | `common.exception` | `ErrorCode` enum, `BusinessException`, `@RestControllerAdvice` 전역 처리 |
 | `common.time` | KST 변환, 일자(`yyyyMMdd`)/시간(`HHmmss`) 포맷 |
 | `common.config` | 서비스 기준 시각 `Clock` 빈 (고정 시각 또는 시스템 시각) |
@@ -104,30 +104,37 @@
 - **애플리케이션 락(synchronized, 분산 락)**: 인스턴스가 여러 대면 synchronized는 동작하지 않습니다. 분산 락은 외부 인프라(Redis 등)가 필요해 과제 실행 조건(외부 인프라 없음)과 맞지 않습니다.
 - **카운터 컬럼 원자적 증가**: 전체 횟수에는 효과적이지만, 일별 횟수와 1시간 제한까지 한 번에 보장하기 어렵습니다.
 
-## 3. 외부 쿠폰 시스템 재현
+## 3. 요청값 검증과 코드 규칙 (교정 1)
+
+- **요청값 검증:** 컨트롤러 경로 변수에 Bean Validation 제약(`@NotBlank`, `@Size`, `@Pattern`, `@Positive`)을 선언했습니다. Spring MVC 내장 메서드 검증이 `HandlerMethodValidationException`을 던지면 전역 핸들러가 제약 종류에 따라 `MISSING_REQUIRED_VALUE` / `INVALID_FORMAT` / `OUT_OF_RANGE`(400)로 바꿉니다. 검증에 실패하면 서비스 로직까지 가지 않습니다.
+- **에러 응답:** 모든 실패 응답은 `code` = 영문 사유 코드(ErrorCode enum 이름), `msg` = 한글 메시지입니다. HTTP 상태 코드는 그대로입니다.
+- **Lombok:** 엔티티는 `@Getter` + `@NoArgsConstructor(access = PROTECTED)`만 씁니다. `@Data`·`@Setter`는 쓰지 않아 상태 변경은 도메인 메서드(`grantPoint`, `markNoReward` 등)로만 합니다.
+- **의존성 주입:** 모든 빈이 `private final` 필드 + `@RequiredArgsConstructor` 생성자 주입을 씁니다.
+
+## 4. 외부 쿠폰 시스템 재현
 
 - `CouponClient` 인터페이스가 과제 8절 계약(8.1 템플릿 조회, 8.2 발급, 8.3 발급 결과 조회)을 그대로 표현합니다.
 - `FakeCouponSystem`은 계약의 모든 결과를 재현합니다. 성공, 404, 한도 소진, 유효하지 않은 템플릿(미존재·발급 중지), 동일 requestId 멱등, 동일 requestId에 다른 내용이면 거부.
 - 외부 시스템 한 대를 흉내 내므로 상태 변경 메서드를 `synchronized`로 원자 처리했습니다.
 - 실제 연동할 때는 HTTP 구현체로 `CouponClient`만 교체하면 됩니다.
 
-## 4. 중요 문제와 우선순위 (과제 12·14절)
+## 5. 중요 문제와 우선순위 (과제 12·14절)
 
 > 이번 작업 범위(최초 프롬프트)에서는 과제 12·14절 "추가로 발견한 문제" 선정과 작성을 제외했습니다. 후속 작업에서 작성할 예정입니다.
 >
 > 참고로 2.3절의 동시성 제어와 쿠폰 멱등 처리는 과제 5절(반복·동시 요청)과 7절(참여 이력당 보상 1회) 정책을 지키기 위한 **기본 구현 범위**로 보고 구현했습니다.
 
-## 5. 검증 방법
+## 6. 검증 방법
 
-- JUnit5 자동화 테스트 58개 (단위 19 / 통합 31 / API 8)
+- JUnit5 자동화 테스트 73개 (단위 19 / 통합 31 / API 23)
   - 단위: 참여 정책 경계값, KST 변환, 쿠폰 재현체 계약
   - 통합: 실제 H2·트랜잭션·락을 쓰는 미션/보상 시나리오, 시간 경과(MutableClock)
   - 동시성: 스레드 여러 개로 동시 요청 → 결과 건수 검증
-  - API: MockMvc로 응답 포맷, HTTP 상태, 에러 코드 검증
+  - API: MockMvc로 응답 포맷, HTTP 상태, 에러 코드, 요청값 검증(필수·형식·범위) 확인
 - QA 항목과 테스트 매핑: `test-or-verification/QA_LIST.md`
 - 실행 결과: `test-or-verification/TEST_RESULT.md`
 
-## 6. 현재 구현의 한계와 추가 개선
+## 7. 현재 구현의 한계와 추가 개선
 
 - 같은 미션에 대한 완료 처리가 미션 행 락으로 직렬 처리되어, 참여가 몰리는 미션에서는 처리량이 제한됩니다.
 - 외부 쿠폰 호출이 DB 트랜잭션 안에서 이뤄져, 외부 응답이 지연되면 락 점유 시간이 길어집니다. (개선 방향: 보상 상태를 PENDING으로 먼저 커밋한 뒤 트랜잭션 밖에서 발급하고 결과를 반영)

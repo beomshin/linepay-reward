@@ -7,6 +7,9 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
@@ -15,6 +18,8 @@ import java.time.LocalDateTime;
  * <p>
  * 참여 가능 기간(entry_start_at, entry_end_at)은 일자(yyyyMMdd)/시간(HHmmss) 컬럼으로 나눠 저장한다. (KST)
  */
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "mission")
 public class Mission {
@@ -42,9 +47,6 @@ public class Mission {
     @Column(name = "entry_end_time", nullable = false, length = 6)
     private String entryEndTime;
 
-    protected Mission() {
-    }
-
     public Mission(String missionId, MissionType missionType, String title,
                    String entryStartDate, String entryStartTime,
                    String entryEndDate, String entryEndTime) {
@@ -71,33 +73,5 @@ public class Mission {
      */
     public boolean isInEntryPeriod(LocalDateTime now) {
         return !now.isBefore(getEntryStartAt()) && now.isBefore(getEntryEndAt());
-    }
-
-    public String getMissionId() {
-        return missionId;
-    }
-
-    public MissionType getMissionType() {
-        return missionType;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public String getEntryStartDate() {
-        return entryStartDate;
-    }
-
-    public String getEntryStartTime() {
-        return entryStartTime;
-    }
-
-    public String getEntryEndDate() {
-        return entryEndDate;
-    }
-
-    public String getEntryEndTime() {
-        return entryEndTime;
     }
 }
