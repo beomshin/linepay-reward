@@ -14,6 +14,8 @@
 | QA-X | `integration/ConcurrencyTest` | 통합 (동시성) |
 | QA-A | `api/RewardApiTest` | API (MockMvc) |
 | QA-V | `api/RequestValidationApiTest` | API (MockMvc, 요청값 검증) |
+| QA-E | `config/ProfileConfigTest` | 단위 (프로파일 설정 분리) |
+| QA-L | `unit/TraceIdFilterTest`, `api/TraceIdLoggingTest` | 단위 + API (MDC traceId, 로그) |
 
 ## 1. 시간 기준 (과제 9절, 프롬프트 9절)
 
@@ -127,7 +129,31 @@
 | QA-V08 | Long 범위를 넘는 숫자 → 400 INVALID_FORMAT |
 | QA-V09 | 형식이 맞는 값은 기존 비즈니스 검증으로 이어짐 (없는 사용자 → 404 USER_NOT_FOUND) |
 
-## 10. 검증하지 못한 범위
+## 10. 환경 설정 분리 (교정 2)
+
+| ID | 검증 항목 |
+|---|---|
+| QA-E01 | 공통 설정에 테스트용 설정 없음, 기본 프로파일 local |
+| QA-E02 | local에만 기준 시각 고정(2026-09-01T12:00:00+09:00)과 H2 콘솔 |
+| QA-E03 | dev는 기준 시각을 고정하지 않음 |
+| QA-E04 | prod에 테스트용 설정 없음(H2 콘솔 비활성), 로그 파일 경로 있음 |
+| QA-E05 | 기준 시각 설정이 없으면 시스템 현재 시각(KST) 사용 |
+| QA-E06 | 기준 시각 설정이 있으면 해당 시각으로 고정 |
+
+## 11. 요청 추적 로그 (교정 2: MDC traceId)
+
+| ID | 검증 항목 |
+|---|---|
+| QA-L01 | 요청 처리 중 MDC에 traceId가 있고 응답 헤더 `X-Trace-Id`와 같음 |
+| QA-L02 | 요청이 끝나면 MDC에서 traceId 제거 |
+| QA-L03 | 처리 중 예외가 나도 MDC 제거, 예외는 그대로 전달 |
+| QA-L04 | 요청마다 다른 traceId 발급 |
+| QA-L05 | 동시 요청 50건(스레드 8개 재사용): 요청 안에서는 traceId 유지, 요청 간 섞이지 않음, 시작 시 이전 값 없음 |
+| QA-L06 | 정상 요청의 `[REQ]`·`[MISSION]`·`[RES]` 로그에 같은 traceId, 요청 후 MDC 비워짐 |
+| QA-L07 | 예외 요청의 `[EXC]` 로그에도 같은 traceId |
+| QA-L08 | 연속 두 요청의 로그가 각자 traceId로 구분되고 섞이지 않음 |
+
+## 12. 검증하지 못한 범위
 
 - 여러 애플리케이션 인스턴스와 공유 DB 환경에서의 동시성 (단일 JVM, H2에서만 검증)
 - 실제 HTTP 외부 쿠폰 시스템의 타임아웃·네트워크 오류 (재현체에서는 예외 주입으로만 확인)

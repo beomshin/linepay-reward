@@ -1,6 +1,60 @@
 # 테스트 실행 결과
 
-## 0. 최신 실행 (교정 1 적용 후: Lombok · 생성자 주입 · Spring Validation)
+## 0. 최신 실행 (교정 2 적용 후: 환경 설정 분리 · logback · MDC)
+
+| 항목 | 값 |
+|---|---|
+| 실행일 | 2026-09-26 (KST) |
+| 명령 | `gradlew.bat clean test bootJar` |
+| 결과 | **87개 전체 통과** (기존 73 + 설정 분리 6 + 요청 추적 8) |
+
+| 테스트 클래스 | QA | 테스트 수 | 실패 |
+|---|---|---:|---:|
+| `unit.KstTimeTest` | QA-T | 3 | 0 |
+| `unit.ParticipationPolicyTest` | QA-P | 8 | 0 |
+| `unit.FakeCouponSystemTest` | QA-C | 8 | 0 |
+| `unit.TraceIdFilterTest` | QA-L | 5 | 0 |
+| `config.ProfileConfigTest` | QA-E | 6 | 0 |
+| `integration.MissionServiceTest` | QA-M | 12 | 0 |
+| `integration.RewardServiceTest` | QA-R | 13 | 0 |
+| `integration.CouponIssueFallbackTest` | QA-F | 2 | 0 |
+| `integration.ConcurrencyTest` | QA-X | 4 | 0 |
+| `api.RewardApiTest` | QA-A | 8 | 0 |
+| `api.RequestValidationApiTest` | QA-V | 15 | 0 |
+| `api.TraceIdLoggingTest` | QA-L | 3 | 0 |
+| **합계** | | **87** | **0** |
+
+### 프로파일별 기동 확인 (`java -jar ... --spring.profiles.active=<프로파일>`)
+
+같은 사용자로 `POST /linepay/v1/mission/USER_0001/MISSION_0003/complete`를 호출해 확인했습니다.
+
+| 프로파일 | 활성 프로파일 로그 | 참여 일자 (기준 시각) | H2 콘솔 | 로그 출력 위치 | 같은 traceId 로그 |
+|---|---|---|---|---|---|
+| local | `The following 1 profile is active: "local"` | `20260901` (고정 시각 적용) | 200 | 콘솔 (파일 없음) | `[REQ]`·`[MISSION] completed`·`[RES]` 3줄 |
+| dev | `... "dev"` | `20260926` (시스템 시각) | 200 | 콘솔 | 3줄 |
+| prod | `... "prod"` (로그 파일에서 확인) | `20260926` (시스템 시각) | 404 (비활성) | 파일 `linepay-reward.log` (콘솔에는 기동 배너만) | 로그 파일에 3줄 |
+
+교정 2 완료 조건 확인
+
+| 완료 조건 | 결과 |
+|---|---|
+| 프로파일별 설정 적용, 운영 프로파일에 테스트용 설정 없음 | 위 표 + QA-E01~E06 통과. prod는 기준 시각이 고정되지 않고 H2 콘솔이 꺼짐 |
+| 개발은 콘솔, 운영은 로그 파일 | local·dev는 콘솔에 앱 로그 출력, prod는 콘솔에 앱 로그가 없고 `linepay-reward.log`에 기록 |
+| 같은 요청은 같은 traceId, 요청 간 MDC 섞이지 않음 | QA-L01~L08 통과 (동시 요청 50건·스레드 재사용 포함). 실제 서버에서도 한 요청의 로그 3줄이 같은 traceId |
+
+실행 중 발견한 사항
+
+| 회차 | 결과 | 원인 | 조치 |
+|---|---|---|---|
+| 1회차 | 컴파일 실패 | 테스트의 `FilterChain` 람다 안에서 `Thread.sleep`의 `InterruptedException`을 처리하지 않음 | `LockSupport.parkNanos`로 교체 |
+| 2회차 | 87/87 통과 | prod 기동 시 콘솔에 logback 경고 `Appender named [CONSOLE] not referenced` 출력 | 콘솔 appender 정의를 `!prod` 프로파일 블록 안으로 이동 |
+| 3회차 | 87/87 통과 | prod 콘솔 경고 없음 확인 | - |
+
+---
+
+## 이전 실행 기록 (교정 1)
+
+### 교정 1 적용 후: Lombok · 생성자 주입 · Spring Validation
 
 | 항목 | 값 |
 |---|---|

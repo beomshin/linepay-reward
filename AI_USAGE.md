@@ -367,6 +367,98 @@ AI가 진행 중 발견해 보고한 사항
 
 (소스 경로 기준: `source-code/src/main/java/com/linepay/reward/`)
 
+### 교정 기록 2. 운영 환경 대응 (환경 설정 분리 · logback 설정 · 로그/MDC 적용)
+
+#### 1) 교정 기록 제목
+
+운영 환경 대응: 프로파일별 설정 분리(local/dev/prod), logback-spring.xml 로그 출력 분리, 요청 단위 MDC(traceId) 로그 추적 및 주석 보강
+
+#### 2) 교정이 필요하다고 판단한 이유
+
+- 환경 설정이 `application.yml` 하나에 모여 있어, 기준 시각 고정(`linepay.clock.fixed-at`) 같은 테스트용 설정이 운영 환경에 그대로 적용될 위험이 있음
+- logback 설정이 없어 개발은 콘솔, 운영은 파일로 로그를 나눠 관리할 수 없음
+- API 동작 로그와 요청별 MDC가 없어, 장애가 나면 어떤 요청에서 생긴 로그인지 추적하기 어려움
+- 13.3 초기 결과 검토의 "부족한 부분 1번(환경 설정 분리), 2번(logback 설정), 8번(주석 및 로그 처리, MDC)"에 대한 후속 조치
+
+#### 3) AI에 전달한 후속 지시 원문
+
+세션 지시: `전달된 프롬프트를 프로젝트 적용 개발 진행하기`
+
+첨부한 교정 프롬프트(`교정_2_운영환경대응_프롬프트.md`) 원문:
+
+````markdown
+# 운영 환경 대응 (환경 설정 분리 · logback 설정 · 로그/MDC 적용)
+
+환경별 설정과 로그 출력 방식을 분리하여 운영 안정성을 확보하고, 요청 단위 로그 추적과 주석으로 장애 대응 및 유지보수성을 개선해 주세요.
+
+## 교정 사유
+1. 환경 설정이 분리되지 않아 기준 시각 등 테스트용 설정이 운영 환경에 적용될 위험이 있음
+2. logback 설정이 없어 개발은 콘솔, 운영은 파일로 로그를 관리할 수 없음
+3. API 동작 로그와 요청별 MDC가 없어 장애 발생 시 요청 단위 추적이 어려움
+
+## 지시 사항
+1. application.yml을 공통/local/dev/prod 프로파일로 분리하고, 기준 시각 등 테스트용 설정은 운영 프로파일에 포함하지 않음
+2. logback-spring.xml을 작성하여 개발(local/dev)은 콘솔 출력, 운영(prod)은 일자별 롤링 파일 출력으로 처리
+3. Filter를 적용해 요청마다 MDC(traceId)를 설정하고 API 요청·응답·예외 로그에 포함하며, 요청 종료 시 MDC를 정리하고 주요 비즈니스 로직에 주석 추가
+
+## 완료 조건
+1. 프로파일별로 기동하여 해당 환경 설정이 적용되는지, 운영 프로파일에 테스트용 설정이 없는지 확인
+2. 개발 프로파일은 콘솔로, 운영 프로파일은 로그 파일로 출력되는지 확인
+3. 같은 요청의 로그에는 같은 traceId가 기록되고, 서로 다른 요청 간에 MDC 값이 섞이지 않는지 확인
+````
+
+#### 4) AI의 결과
+
+| 지시 사항 | AI 결과 |
+|---|---|
+| 프로파일 분리 | `application.yml`(공통: 앱 이름, DB, JPA, 서버, `spring.profiles.default: local`)과 `application-local.yml` / `application-dev.yml` / `application-prod.yml`로 분리. 기준 시각 고정과 H2 콘솔은 local에만 두고, dev는 시스템 시각 + H2 콘솔, prod는 시스템 시각 + H2 콘솔 비활성 + 로그 파일 경로(`./logs`) |
+| logback 설정 | `logback-spring.xml` 작성. `!prod`(local·dev·미지정)는 콘솔, `prod`는 `RollingFileAppender` + `TimeBasedRollingPolicy`(일자별 `linepay-reward.yyyy-MM-dd.log`, 30일 보관). 모든 라인에 `[%X{traceId}]` 출력 |
+| MDC Filter | `common/logging/TraceIdFilter`(`OncePerRequestFilter`, 최우선 순서) 추가. 요청마다 UUID traceId를 MDC에 넣고 응답 헤더 `X-Trace-Id`로 반환. `[REQ]` 요청 로그, `[RES]` 상태 코드·처리 시간 로그, 필터까지 올라온 예외는 `[ERR]` 로그 후 다시 던짐. `finally`에서 `MDC.remove`로 정리 |
+| 요청·응답·예외 로그 | `GlobalExceptionHandler` 로그에 `[EXC]` 접두어 추가. `MissionService`(`[MISSION]` 목록 조회 debug, 완료·거절 info), `RewardService`(`[REWARD]` 지급 결과, 중복 요청, 쿠폰 제외, 쿠폰 복구, 예상하지 못한 외부 결과) 로그 추가 |
+| 주석 | 미션 완료(락 획득 → 조건 검사 → 이력 생성), 보상 지급(락·소유자 확인 → 1회 지급 확인 → 선정·저장) 단계별 주석 추가. 설정 파일마다 프로파일 용도와 테스트용 설정 위치 주석 |
+| 테스트 추가 | `ProfileConfigTest`(QA-E01~E06, 6건), `TraceIdFilterTest`(QA-L01~L05, 5건), `TraceIdLoggingTest`(QA-L06~L08, 3건, 콘솔 로그 캡처) |
+| 문서 반영 | `README.md`(프로파일별 실행·설정 표, traceId 로그 예시), `DESIGN.md`(4. 운영 환경 대응), `api-spec.md`(`X-Trace-Id` 헤더), `QA_LIST.md`(QA-E, QA-L), `TEST_RESULT.md`, `.gitignore`(`logs/`) |
+
+AI가 진행 중 판단하거나 보고한 사항
+
+- dev 프로파일의 기준 시각: 지시는 "운영 프로파일에 포함하지 않음"이었으나, dev도 공유 개발 서버로 보고 기준 시각을 고정하지 않고 local에만 둠
+- 프로파일 기동 검증은 JUnit에서 prod 컨텍스트를 띄우면 로그 설정(파일 출력)이 같은 JVM의 다른 테스트에 영향을 줄 수 있어, 설정 파일 단위 테스트 + 실제 jar 프로파일별 기동으로 나눠 검증
+- 운영 프로파일도 과제 실행 조건(외부 인프라 없음)에 맞춰 In-memory H2를 그대로 쓰며, 실제 운영에서는 DB 설정을 따로 두어야 한다고 README 제약사항에 기록
+- 13.3에서 지적된 쿠폰 후보 선정 `while`문 등은 이번 교정 범위가 아니어서 변경하지 않음
+
+#### 5) 본인의 판단 (그대로 반영 / 수정하여 반영 / 반영하지 않음 / 추가 확인 후 결정)
+
+
+
+#### 6) 결과 검증
+
+| 완료 조건 | 검증 방법 | 결과 |
+|---|---|---|
+| 프로파일별 설정 적용, 운영 프로파일에 테스트용 설정 없음 | `ProfileConfigTest` + `java -jar --spring.profiles.active=local/dev/prod` 기동 후 API 호출 | local은 참여 일자 `20260901`(고정 시각), dev·prod는 `20260926`(시스템 시각). H2 콘솔 local·dev 200, prod 404 |
+| 개발은 콘솔, 운영은 로그 파일 | 프로파일별 기동 후 표준 출력과 로그 파일 확인 | local·dev는 콘솔에 앱 로그 출력(파일 없음), prod는 콘솔에 기동 배너만 있고 `linepay-reward.log`에 앱 로그 기록 |
+| 같은 요청은 같은 traceId, 요청 간 섞이지 않음 | `TraceIdFilterTest`(동시 50건, 스레드 8개 재사용), `TraceIdLoggingTest`(콘솔 로그 캡처), 실제 서버 로그 | 한 요청의 `[REQ]`·`[MISSION]`·`[RES]` 로그가 같은 traceId, 요청마다 traceId가 다르고 요청 시작 시 이전 값이 남아 있지 않음 |
+
+테스트 실행 이력
+
+| 회차 | 결과 | 비고 |
+|:--:|---|---|
+| 1 | 컴파일 실패 | 테스트 람다 안 `Thread.sleep`의 `InterruptedException` 미처리 → `LockSupport.parkNanos`로 교체 |
+| 2 | 87/87 통과 | prod 기동 시 콘솔에 logback 경고(`Appender named [CONSOLE] not referenced`) → 콘솔 appender를 `!prod` 블록 안으로 이동 |
+| 3 | 87/87 통과 | prod 콘솔 경고 없음, 프로파일별 출력 위치 재확인 |
+
+#### 7) 최종 반영 위치
+
+| 구분 | 파일 |
+|---|---|
+| 환경 설정 | `source-code/src/main/resources/application.yml`, `application-local.yml`(신규), `application-dev.yml`(신규), `application-prod.yml`(신규) |
+| 로그 설정 | `source-code/src/main/resources/logback-spring.xml`(신규) |
+| 요청 추적 | `common/logging/TraceIdFilter.java`(신규) |
+| 로그·주석 | `common/exception/GlobalExceptionHandler.java`, `mission/service/MissionService.java`, `reward/service/RewardService.java` |
+| 테스트 | `config/ProfileConfigTest.java`, `unit/TraceIdFilterTest.java`, `api/TraceIdLoggingTest.java` (모두 신규) |
+| 문서 | `README.md`, `DESIGN.md`, `api-spec.md`, `test-or-verification/QA_LIST.md`, `TEST_RESULT.md`, `.gitignore` |
+
+(소스 경로 기준: `source-code/src/main/java/com/linepay/reward/`, 테스트: `test-or-verification/src/test/java/com/linepay/reward/`)
+
 ## 13.5 최종 회고
 
 > 이번 요청에서는 제외 (후속 작성 예정)

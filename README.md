@@ -26,12 +26,12 @@
 ├── source-code/                       # 애플리케이션 코드
 │   └── src/main/
 │       ├── java/com/linepay/reward/
-│       │   ├── common/     (공통 응답, ErrorCode, 전역 예외 처리, KST 시간, Clock 설정)
+│       │   ├── common/     (공통 응답, ErrorCode, 전역 예외 처리, KST 시간, Clock 설정, 요청 추적 필터)
 │       │   ├── user/       (사용자)
 │       │   ├── mission/    (미션, 보상 아이템, 참여 이력, 참여 정책, 미션 API)
 │       │   ├── reward/     (보상 지급/조회, 보상 API)
 │       │   └── coupon/     (외부 쿠폰 시스템 계약 + In-memory 재현체)
-│       └── resources/ (application.yml, data.sql = Seed Data)
+│       └── resources/ (application.yml + application-{local,dev,prod}.yml, logback-spring.xml, data.sql = Seed Data)
 └── test-or-verification/              # 테스트 및 검증 자료
     ├── src/test/java/...              # JUnit5 자동화 테스트
     ├── QA_LIST.md                     # QA 항목과 테스트 매핑
@@ -45,21 +45,48 @@
 ## 3. 실행 방법
 
 ```bash
-# macOS / Linux
+# macOS / Linux (프로파일 미지정 시 local)
 ./gradlew bootRun
 
 # Windows
 gradlew.bat bootRun
+
+# 프로파일 지정 (local | dev | prod)
+./gradlew bootRun --args='--spring.profiles.active=prod'
+java -jar build/libs/linepay-reward-0.0.1.jar --spring.profiles.active=prod
 ```
 
 - 서버: `http://localhost:8080`
-- H2 Console: `http://localhost:8080/h2-console` (JDBC URL `jdbc:h2:mem:linepay`, user `sa`)
+- H2 Console (local, dev만): `http://localhost:8080/h2-console` (JDBC URL `jdbc:h2:mem:linepay`, user `sa`)
 - 시작할 때 `data.sql`로 Seed Data(User, Mission, Mission Item)를 적재합니다. 쿠폰 템플릿은 외부 쿠폰 재현체(`FakeCouponSystem`)가 가지고 시작합니다.
 
-### 기준 시각
+### 프로파일별 설정
 
-`application.yml`의 `linepay.clock.fixed-at`로 서비스 기준 시각을 **2026-09-01T12:00:00+09:00**(과제 9절 검증 기준 시각)에 고정했습니다.
-값을 비우면 시스템 현재 시각(KST)을 사용합니다.
+| 프로파일 | 설정 파일 | 기준 시각 | H2 콘솔 | 로그 출력 |
+|---|---|---|---|---|
+| (공통) | `application.yml` | - | - | - |
+| local (기본) | `application-local.yml` | 2026-09-01T12:00:00+09:00 고정 | 사용 | 콘솔 |
+| dev | `application-dev.yml` | 시스템 현재 시각(KST) | 사용 | 콘솔 |
+| prod | `application-prod.yml` | 시스템 현재 시각(KST) | 사용 안 함 | 파일 `./logs/linepay-reward.log` (일자별 롤링, 30일 보관) |
+
+- 테스트용 설정(기준 시각 고정, H2 콘솔)은 prod 프로파일에 두지 않습니다.
+- prod 로그 경로는 `--logging.file.path=<경로>`로 바꿀 수 있습니다.
+
+### 요청 추적 로그 (traceId)
+
+- 요청마다 traceId를 만들어 MDC에 넣고, 모든 로그 라인에 `[traceId]`로 출력합니다. 같은 값을 응답 헤더 `X-Trace-Id`로도 돌려줍니다.
+- API 요청(`[REQ]`)·응답(`[RES]` 상태 코드, 처리 시간)·예외(`[EXC]`)·비즈니스(`[MISSION]`, `[REWARD]`) 로그를 남깁니다.
+
+```
+2026-09-26 10:00:41.123 INFO  [79b10881ec264eb0b027bfad03d4fb21] [http-nio-8080-exec-2] c.l.r.common.logging.TraceIdFilter - [REQ] POST /linepay/v1/mission/USER_0001/MISSION_0003/complete
+2026-09-26 10:00:41.170 INFO  [79b10881ec264eb0b027bfad03d4fb21] [http-nio-8080-exec-2] c.l.r.mission.service.MissionService - [MISSION] completed userId=USER_0001 missionId=MISSION_0003 participationId=1
+2026-09-26 10:00:41.176 INFO  [79b10881ec264eb0b027bfad03d4fb21] [http-nio-8080-exec-2] c.l.r.common.logging.TraceIdFilter - [RES] POST /linepay/v1/mission/USER_0001/MISSION_0003/complete status=200 elapsed=53ms
+```
+
+### 기준 시각 (local)
+
+`application-local.yml`의 `linepay.clock.fixed-at`로 서비스 기준 시각을 **2026-09-01T12:00:00+09:00**(과제 9절 검증 기준 시각)에 고정했습니다.
+값이 없으면(dev, prod) 시스템 현재 시각(KST)을 사용합니다.
 
 ```yaml
 linepay:
@@ -111,6 +138,7 @@ API 상세는 [api-spec.md](api-spec.md)를 참고해 주세요.
 
 ## 7. 알려진 제약사항
 
+- prod 프로파일도 과제 실행 조건(외부 인프라 없음)에 맞춰 In-memory H2와 Seed Data를 그대로 씁니다. 실제 운영에서는 DB 연결 정보를 prod 설정에 따로 두어야 합니다.
 - In-memory H2를 쓰므로 애플리케이션을 재시작하면 참여·보상 이력이 초기화됩니다. 쿠폰 재현체도 메모리에 상태를 둡니다.
 - 동시성 제어는 단일 DB의 행 락(`SELECT ... FOR UPDATE`)에 의존합니다. 같은 미션에 대한 완료 요청은 직렬로 처리되므로, 인기 미션에서는 처리량이 제한될 수 있습니다.
 - 외부 쿠폰 발급 호출이 DB 트랜잭션(락) 안에서 이뤄집니다. 실제 외부 연동에서 응답이 느려지면 락을 쥐는 시간도 길어집니다.

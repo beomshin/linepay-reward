@@ -10,6 +10,7 @@
 | 메서드 | 조회 `GET`, 미션 완료 처리·보상 지급 요청 `POST` |
 | 사용자 식별 | PathVariable `{userId}` (인증 없음, 과제 11절) |
 | 시간 표기 | KST 기준, 일자 `yyyyMMdd` / 시간 `HHmmss` 필드 분리 |
+| 요청 추적 | 모든 응답 헤더에 `X-Trace-Id`(요청별 traceId, 32자리) 포함. 서버 로그의 `[traceId]`와 같은 값 |
 
 ### 1.1 요청값 검증 (Spring Validation)
 
