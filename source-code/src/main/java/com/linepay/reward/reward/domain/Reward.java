@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
  * <ul>
  *     <li>{@link RewardStatus#GRANTED}   : 포인트 또는 쿠폰 지급 완료. 추가 지급 불가</li>
  *     <li>{@link RewardStatus#NO_REWARD} : 지급 가능한 보상이 없었음. 재요청 시 같은 행을 갱신</li>
+ *     <li>{@link RewardStatus#FAILED}    : 쿠폰 시스템 통신 실패로 지급하지 못함. 재요청 시 같은 행을 갱신</li>
  * </ul>
  * 리워드 포인트는 서비스 내부에서 관리하므로 지급 금액을 이 테이블에 기록한다.
  */
@@ -85,6 +86,10 @@ public class Reward {
     @Column(name = "coupon_request_id", length = 100)
     private String couponRequestId;
 
+    /** 지급 실패 사유 (FAILED 인 경우만) */
+    @Column(name = "failure_reason", length = 200)
+    private String failureReason;
+
     /** 최근 처리 일자 (yyyyMMdd, KST) */
     @Column(name = "processed_date", nullable = false, length = 8)
     private String processedDate;
@@ -125,14 +130,27 @@ public class Reward {
 
     /** 지급 가능한 보상 없음 */
     public void markNoReward(LocalDateTime now) {
+        clearItem();
         this.rewardStatus = RewardStatus.NO_REWARD;
+        touch(now);
+    }
+
+    /** 쿠폰 시스템 통신 실패로 지급하지 못함 (보상 처리: 실패 상태를 남겨 재요청·운영 확인이 가능하게 한다) */
+    public void markFailed(String reason, LocalDateTime now) {
+        clearItem();
+        this.rewardStatus = RewardStatus.FAILED;
+        this.failureReason = reason == null || reason.length() <= 200 ? reason : reason.substring(0, 200);
+        touch(now);
+    }
+
+    private void clearItem() {
         this.missionItemId = null;
         this.itemType = null;
         this.pointAmount = null;
         this.couponTemplateId = null;
         this.couponId = null;
         this.couponRequestId = null;
-        touch(now);
+        this.failureReason = null;
     }
 
     private void grant(MissionItem item, LocalDateTime now) {
@@ -141,6 +159,7 @@ public class Reward {
             throw new IllegalStateException("이미 보상이 지급된 참여 이력입니다. participationNo=" + participationNo);
         }
         this.rewardStatus = RewardStatus.GRANTED;
+        this.failureReason = null;
         this.missionItemId = item.getMissionItemId();
         this.itemType = item.getItemType();
         touch(now);

@@ -11,6 +11,7 @@ import com.linepay.reward.reward.domain.RewardStatus;
  *     <li>포인트 지급: rewardStatus=GRANTED, itemType=REWARD_POINT, pointAmount=5~10</li>
  *     <li>쿠폰 지급  : rewardStatus=GRANTED, itemType=COUPON, couponTemplateId/couponId</li>
  *     <li>보상 없음  : rewardStatus=NO_REWARD, 보상 관련 필드는 null</li>
+ *     <li>지급 실패  : rewardStatus=FAILED, failureReason=실패 사유 (쿠폰 시스템 통신 실패, 재요청 가능)</li>
  * </ul>
  */
 public record RewardResponse(
@@ -25,7 +26,8 @@ public record RewardResponse(
         String couponTemplateId,
         String couponId,
         String processedDate,
-        String processedTime
+        String processedTime,
+        String failureReason
 ) {
     public static RewardResponse from(Reward reward) {
         return new RewardResponse(
@@ -40,6 +42,7 @@ public record RewardResponse(
                 reward.getCouponTemplateId(),
                 reward.getCouponId(),
                 reward.getProcessedDate(),
-                reward.getProcessedTime());
+                reward.getProcessedTime(),
+                reward.getFailureReason());
     }
 }

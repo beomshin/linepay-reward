@@ -143,6 +143,7 @@
 - 리워드 포인트: 5 이상 10 이하 무작위 값
 - 쿠폰: 외부 쿠폰 시스템에서 1개 발급 (한도 소진·발급 중지 템플릿은 후보에서 제외)
 - 지급 가능한 보상이 없으면 `rewardStatus = NO_REWARD`로 **정상 응답(200)** 하며, 같은 참여 이력으로 다시 요청할 수 있습니다.
+- 쿠폰 API 호출 중 IO 오류·타임아웃이 나면 503 `COUPON_COMMUNICATION_FAILED`, 예상하지 못한 응답이나 그 외 예외가 나면 500 `COUPON_SYSTEM_ERROR`로 응답합니다. 두 경우 모두 보상 결과를 `rewardStatus = FAILED`(실패 사유 `failureReason` 포함)로 저장하며, 같은 이력번호로 다시 요청할 수 있고 리워드번호는 그대로 유지됩니다.
 
 **Response 200 - 포인트 지급**
 ```json
@@ -161,7 +162,8 @@
     "couponTemplateId": null,
     "couponId": null,
     "processedDate": "20260901",
-    "processedTime": "120000"
+    "processedTime": "120000",
+    "failureReason": null
   }
 }
 ```
@@ -183,7 +185,8 @@
     "couponTemplateId": "COUPON_TEMPLATE_0001",
     "couponId": "COUPON_0001",
     "processedDate": "20260901",
-    "processedTime": "120000"
+    "processedTime": "120000",
+    "failureReason": null
   }
 }
 ```
@@ -205,7 +208,8 @@
     "couponTemplateId": null,
     "couponId": null,
     "processedDate": "20260901",
-    "processedTime": "120000"
+    "processedTime": "120000",
+    "failureReason": null
   }
 }
 ```
@@ -217,7 +221,8 @@
 | 404 | USER_NOT_FOUND | 사용자를 찾을 수 없습니다. | 존재하지 않는 사용자 |
 | 404 | PARTICIPATION_NOT_FOUND | 미션 참여 이력을 찾을 수 없습니다. | 이력번호가 없거나 요청 사용자의 이력이 아님 (DB PK 숫자로는 조회되지 않음) |
 | 409 | REWARD_ALREADY_GRANTED | 이미 보상이 지급된 미션 참여입니다. | 이미 보상이 지급된 참여 이력 |
-| 500 | COUPON_SYSTEM_ERROR | 쿠폰 발급 처리 중 오류가 발생했습니다. | 외부 쿠폰 시스템이 예상하지 못한 결과 반환 |
+| 500 | COUPON_SYSTEM_ERROR | 쿠폰 발급 처리 중 오류가 발생했습니다. | 쿠폰 시스템이 예상하지 못한 결과를 반환하거나 호출 중 그 외 예외 발생 (보상 결과는 `FAILED`로 저장) |
+| 503 | COUPON_COMMUNICATION_FAILED | 쿠폰 시스템과 통신하지 못해 보상을 지급하지 못했습니다. 잠시 후 다시 요청해 주세요. | 쿠폰 시스템 IO 오류·타임아웃 (보상 결과는 `FAILED`로 저장) |
 
 ---
 
@@ -255,6 +260,10 @@
 | 409 | REWARD_ALREADY_GRANTED | 이미 보상이 지급된 미션 참여입니다. |
 | 500 | COUPON_SYSTEM_ERROR | 쿠폰 발급 처리 중 오류가 발생했습니다. |
 | 500 | INTERNAL_SERVER_ERROR | 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요. |
+| 503 | COUPON_COMMUNICATION_FAILED | 쿠폰 시스템과 통신하지 못해 보상을 지급하지 못했습니다. 잠시 후 다시 요청해 주세요. |
+| 503 | DATABASE_ERROR | 데이터 처리 중 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요. |
+
+모든 API는 DB 장애(연결 실패, 락 대기 초과 등) 시 503 `DATABASE_ERROR`로 응답합니다.
 
 에러 코드는 `ErrorCode` enum으로 정의하고, `GlobalExceptionHandler`(`@RestControllerAdvice`)에서 한 번에 처리합니다.
 

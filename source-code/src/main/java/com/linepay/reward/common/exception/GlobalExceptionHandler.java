@@ -4,6 +4,7 @@ import com.linepay.reward.common.response.ApiResponse;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -80,6 +81,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleMethodNotAllowed(HttpRequestMethodNotSupportedException e) {
         log.info("[EXC] 지원하지 않는 HTTP 메서드: {}", e.getMethod());
         return toResponse(ErrorCode.METHOD_NOT_ALLOWED);
+    }
+
+    /** DB 장애 (연결 실패, 락 대기 초과, 제약조건 위반 등 Spring 데이터 접근 예외) */
+    @ExceptionHandler(DataAccessException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataAccess(DataAccessException e) {
+        log.error("[EXC] DB 처리 오류: {}", e.getClass().getSimpleName(), e);
+        return toResponse(ErrorCode.DATABASE_ERROR);
     }
 
     /** 그 외 예상하지 못한 오류 */

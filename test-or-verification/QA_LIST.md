@@ -17,6 +17,7 @@
 | QA-E | `config/ProfileConfigTest` | 단위 (프로파일 설정 분리) |
 | QA-L | `unit/TraceIdFilterTest` | 단위 (MDC traceId) |
 | QA-K | `integration/BusinessKeyTest` | 통합 (비즈니스 키 채번, 유니크 제약) |
+| QA-D | `integration/FailureScenarioTest`, `integration/DatabaseFailureTest` | 통합 + API (실패·장애 상황) |
 
 ## 1. 시간 기준 (과제 9절, 프롬프트 9절)
 
@@ -92,7 +93,7 @@
 | ID | 검증 항목 |
 |---|---|
 | QA-F01 | 조회 때는 가능했지만 발급 때 한도 소진 → 쿠폰 제외 후 포인트로 재선정 |
-| QA-F02 | 예상하지 못한 외부 오류 → COUPON_SYSTEM_ERROR(500), 보상 결과 저장 안 함 (롤백) |
+| QA-F02 | 예상하지 못한 외부 오류(REQUEST_ID_CONFLICT) → COUPON_SYSTEM_ERROR(500), 보상 결과 FAILED 저장 |
 
 ## 7. 반복·동시 요청 (과제 5절)
 
@@ -162,7 +163,19 @@
 | QA-K05 | 같은 리워드번호 / 같은 참여 이력에 보상 결과 두 번 저장 → DB 유니크 제약 위반 |
 | QA-K06 | NO_REWARD 후 재요청하면 같은 리워드번호 유지 |
 
-## 13. 검증하지 못한 범위
+## 13. 실패·장애 상황 (교정 4)
+
+| ID | 구분 | 검증 항목 |
+|---|---|---|
+| QA-D01 | 애플리케이션 시스템 이슈 | 처리 중 예상하지 못한 예외 → 500 INTERNAL_SERVER_ERROR(한글 메시지, data=null), 참여 이력 생성 안 됨 |
+| QA-D02 | 참여 기간 초과 | 종료 시각(2027-01-01 00:00:00) 완료 요청 → 409 MISSION_NOT_IN_PERIOD, 이력 없음. 1초 전(23:59:59)은 성공 |
+| QA-D03 | 쿠폰 발급 IO 오류 | 쿠폰 발급 IO 오류 → 503 COUPON_COMMUNICATION_FAILED(한글 메시지), 보상 결과 FAILED 저장(롤백 안 됨), 결과 조회도 FAILED |
+| QA-D04 | 쿠폰 발급 타임아웃 → 재요청 | 읽기 타임아웃 예외(`SocketTimeoutException`) → FAILED, 쿠폰 시스템 회복 뒤 같은 이력번호로 재요청하면 같은 리워드번호로 쿠폰 지급, 쿠폰 1개만 발급 |
+| QA-D05 | 쿠폰 템플릿 조회 IO 오류 | 템플릿 조회 IO 오류 → 503 COUPON_COMMUNICATION_FAILED, FAILED 저장 |
+| QA-D07 | 쿠폰 발급 결과 조회 기타 예외 | 발급 결과 조회 중 예상하지 못한 예외(`IllegalStateException`) → 500 COUPON_SYSTEM_ERROR(한글 메시지), FAILED 저장 (사유: `쿠폰 발급 결과 조회 실패 (IllegalStateException)`) |
+| QA-D06 | DB 시스템 이슈 | DB 연결 실패 → 503 DATABASE_ERROR(한글 메시지), 참여 이력 생성 안 됨 |
+
+## 14. 검증하지 못한 범위
 
 - 여러 애플리케이션 인스턴스와 공유 DB 환경에서의 동시성 (단일 JVM, H2에서만 검증)
 - 실제 HTTP 외부 쿠폰 시스템의 타임아웃·네트워크 오류 (재현체에서는 예외 주입으로만 확인)

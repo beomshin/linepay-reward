@@ -50,10 +50,14 @@ public enum ErrorCode {
     /** 이미 보상이 지급된 참여 이력 */
     REWARD_ALREADY_GRANTED(HttpStatus.CONFLICT, "이미 보상이 지급된 미션 참여입니다."),
 
-    // ---------- 500 서버 오류 ----------
-    /** 외부 쿠폰 시스템이 예상하지 못한 결과를 반환함 */
+    // ---------- 500/503 서버 오류 ----------
+    /** 외부 쿠폰 시스템이 예상하지 못한 결과를 반환하거나 처리 중 예외 발생 - 보상 결과는 FAILED 로 저장됨 */
     COUPON_SYSTEM_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "쿠폰 발급 처리 중 오류가 발생했습니다."),
-    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."),
+    /** 쿠폰 시스템과 통신하지 못함 (IO 오류·타임아웃 등) - 보상 결과는 FAILED 로 저장됨 */
+    COUPON_COMMUNICATION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "쿠폰 시스템과 통신하지 못해 보상을 지급하지 못했습니다. 잠시 후 다시 요청해 주세요."),
+    /** DB 연결 실패, 락 대기 초과 등 데이터 처리 오류 */
+    DATABASE_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "데이터 처리 중 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
 
     private final HttpStatus httpStatus;
     private final String message;

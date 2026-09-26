@@ -48,7 +48,7 @@ class CouponIssueFallbackTest extends IntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("QA-F02 예상하지 못한 외부 오류(REQUEST_ID_CONFLICT)는 COUPON_SYSTEM_ERROR, 보상 결과는 저장되지 않는다")
+    @DisplayName("QA-F02 예상하지 못한 외부 오류(REQUEST_ID_CONFLICT)는 COUPON_SYSTEM_ERROR, 보상 결과는 FAILED 로 저장된다")
     void unexpectedCouponError() {
         doThrow(new CouponApiException(CouponErrorType.REQUEST_ID_CONFLICT)).when(couponSpy).issueCoupon(any());
         String participationNo = missionService.completeMission("USER_0001", "MISSION_0002").participationNo();
@@ -57,6 +57,7 @@ class CouponIssueFallbackTest extends IntegrationTestSupport {
         assertThatThrownBy(() -> rewardService.requestReward("USER_0001", participationNo))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.COUPON_SYSTEM_ERROR);
-        assertThat(rewardRepository.findByParticipationNo(participationNo)).isEmpty();
+        assertThat(rewardRepository.findByParticipationNo(participationNo))
+                .get().extracting("rewardStatus").isEqualTo(com.linepay.reward.reward.domain.RewardStatus.FAILED);
     }
 }

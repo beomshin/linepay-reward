@@ -150,6 +150,8 @@ linepay:
 - 보상: 참여 이력 1건당 보상 1회, 보상 아이템 중 무작위 선택, 포인트 5~10 무작위, 쿠폰은 한도 소진·발급 중지 시 제외, 지급 가능한 보상이 없으면 `NO_REWARD` 반환 후 재요청 허용
 - 요청값 검증: 필수값 누락을 400과 영문 코드(`MISSING_REQUIRED_VALUE`) + 한글 메시지로 응답
 - 비즈니스 키: 참여 이력은 이력번호(`PT…`), 보상 결과는 리워드번호(`RW…`)로 식별. DB 시퀀스로 중복 없이 채번하고 유니크 제약조건으로 한 번 더 막음
+- 쿠폰 API 호출 실패 처리: `getCouponTemplate`·`issueCoupon`·`getCouponIssue` 호출부에서 IO 오류·타임아웃은 503 `COUPON_COMMUNICATION_FAILED`, 예상하지 못한 응답·그 외 예외는 500 `COUPON_SYSTEM_ERROR`로 응답하고, 두 경우 모두 보상 결과를 `FAILED`로 저장 (같은 이력번호로 재요청 가능). 타임아웃은 실제 연동 시 HTTP 클라이언트에서 설정
+- DB 장애: 데이터 접근 예외를 503 `DATABASE_ERROR`로 응답
 - 반복·동시 요청: 미션 단위(완료 처리), 참여 이력 단위(보상 지급)로 DB 비관적 락을 걸어 정책이 깨지지 않도록 처리
 - 외부 쿠폰 시스템: `CouponClient` 계약 + `FakeCouponSystem` 재현체 (멱등 requestId, 한도 소진, 유효하지 않은 템플릿, 404)
 

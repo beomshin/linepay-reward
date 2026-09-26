@@ -568,6 +568,95 @@ AI가 진행 중 판단하거나 보고한 사항
 
 (소스 경로 기준: `source-code/src/main/java/com/linepay/reward/`, 테스트: `test-or-verification/src/test/java/com/linepay/reward/`)
 
+### 교정 기록 4. 예외 처리 및 장애 포인트 사전 방지 (쿠폰 예외 보완 · 반복문 개선 · 실패 테스트 추가)
+
+#### 1) 교정 기록 제목
+
+예외 처리 및 장애 포인트 사전 방지: 쿠폰 API 호출부의 IO·타임아웃·기타 예외 처리와 실패 내역 저장, 보상 후보 선정 반복문의 for문 전환, 실패·장애 상황 테스트 추가
+
+#### 2) 교정이 필요하다고 판단한 이유
+
+- 쿠폰 API 호출부가 `CouponApiException`만 처리하고 있어, IO 오류·타임아웃 같은 예외가 나면 처리되지 않은 채 장애로 이어지고 실패 내역도 남지 않음
+- 보상 후보를 `while (!candidates.isEmpty())`로 선정하고 있어, 이후 조건이 바뀌면 무한루프에 빠질 잠재적 위험이 있음
+- 애플리케이션·DB 장애, 참여 기간 초과, 쿠폰 통신 오류 같은 실패 상황에 대한 테스트가 부족함
+- 13.3 초기 결과 검토의 "부족한 부분 6번(예외 처리 케이스), 7번(장애 포인트 사전 방지)", "추가 확인 5번(QA 필요 항목 추가), 6번(쿠폰 IO Exception 처리)", "가장 중요하게 선택한 문제 1순위(장애 포인트 로직 확인)"에 대한 후속 조치
+
+#### 3) AI에 전달한 후속 지시 원문
+
+세션 지시: `교정 기록 4번째 사항 적용 및 기록 처리`
+
+전달한 교정 프롬프트(`교정_4_예외처리_장애방지_프롬프트.md`) 원문:
+
+````markdown
+# 예외 처리 및 장애 포인트 사전 방지 (쿠폰 예외 보완 · 반복문 개선 · 실패 테스트 추가)
+
+쿠폰 발급 외부 통신의 예외 처리와 재시도·보상 처리를 보완하고, 잠재적 무한루프를 제거하고 실패 케이스 테스트로 서비스 안정성을 확보해 주세요.
+
+## 교정 사유
+1. 쿠폰 발급 로직에서 `CouponApiException` 외의 Exception(IO Exception 등)이 처리되지 않아 장애로 이어질 수 있음
+2. 보상 candidates를 while문으로 선정하고 있어, 조건이 바뀌면 무한루프에 빠질 잠재적 위험이 있음
+3. 시스템·DB 장애, 참여 기간 초과, 쿠폰 통신 오류 등 실패 케이스에 대한 테스트가 부족함
+
+## 지시 사항
+1. 쿠폰 발급 시 `CouponApiException` 외에 IO Exception·타임아웃 등의 예외도 처리 적용
+2. 보상 candidates 선정 while문을 반복 횟수가 명확한 for문으로 변경
+3. 다음 실패 테스트를 추가
+   - 애플리케이션 시스템 이슈에 대한 실패 테스트
+   - DB 시스템 이슈에 대한 실패 테스트
+   - 미션 참여 가능 기간 초과 상태에서의 완료 요청 실패 테스트
+   - 쿠폰 발급 통신 오류 실패 혹은 리워드 보상 테스트
+
+## 완료 조건
+1. 쿠폰 API에서 IO Exception·타임아웃이 발생하면 정해진 횟수만큼 재시도한 뒤 보상 처리되는지, 정의된 에러 코드와 한글 메시지로 응답하는지 확인
+2. 보상 candidates 선정 로직을 for문으로 바꾼 뒤에도 기존 테스트 결과가 동일한지 확인
+3. 추가한 실패 테스트 4종이 모두 통과하는지 확인
+````
+
+#### 4) AI의 결과
+
+| 지시 사항 | AI 결과 |
+|---|---|
+| IO Exception·타임아웃 등 예외 처리 | `getCouponTemplate`·`issueCoupon`·`getCouponIssue`를 호출하는 3곳(`isCouponIssuable`, 발급 반복문, `findIssuedCoupon`)에서 예외를 종류별로 처리. `CouponApiException` 중 업무 결과(한도 소진·템플릿 없음·발급 이력 없음)는 기존대로 처리하고, `UncheckedIOException`(IO 오류, 읽기 타임아웃 `SocketTimeoutException`)은 `COUPON_COMMUNICATION_FAILED`(503), 예상하지 못한 `CouponApiException`과 그 외 `Exception`은 `COUPON_SYSTEM_ERROR`(500)로 분류해 `CouponFailureException`을 던짐 |
+| 실패 내역 저장 (추가 지시) | `requestReward`가 `CouponFailureException`을 받아 보상 결과를 새 상태 `FAILED`(실패 사유 `failure_reason`, 예: `쿠폰 발급 실패 (UncheckedIOException)`)로 저장하고 `RewardFailedException`을 던짐. `@Transactional(noRollbackFor = RewardFailedException.class)`로 실패 내역이 커밋됨. 같은 이력번호로 재요청하면 리워드번호를 유지한 채 다시 처리하고, 이전 요청에서 실제 발급된 쿠폰은 기존 복구 단계에서 반영 |
+| 호출부 정리 | 쿠폰 발급 성공 후 보상 반영(`grantCoupon`)을 try 블록 밖으로 옮겨, 쿠폰 API 호출 실패와 내부 처리 오류가 섞이지 않게 함. 재시도 로직·별도 실행기 없이 일반적인 동기 호출 그대로 처리 |
+| while → for | 보상 후보 선정을 `for (pickCount < 최초 후보 수 && 후보 남음)`으로 변경. 반복 횟수가 최초 후보 수를 넘지 않음 |
+| DB 장애 응답 | 전역 예외 핸들러에 `DataAccessException` 처리 추가 → 503 `DATABASE_ERROR` + 한글 메시지 |
+| 에러 코드 | `COUPON_COMMUNICATION_FAILED`(503), `DATABASE_ERROR`(503) 추가. `COUPON_SYSTEM_ERROR`(500)는 실패 내역을 저장하는 경우로 의미 확장 |
+| 실패 테스트 | `FailureScenarioTest`: 애플리케이션 시스템 이슈(QA-D01), 참여 기간 초과(QA-D02), 쿠폰 발급 IO 오류(QA-D03), 쿠폰 발급 읽기 타임아웃 후 재요청 지급(QA-D04), 템플릿 조회 IO 오류(QA-D05), 발급 결과 조회 기타 예외(QA-D07). `DatabaseFailureTest`: DB 연결 실패(QA-D06). 기존 QA-F02는 예상하지 못한 외부 오류 시 실패 내역이 저장되도록 기대값 변경 |
+| 문서 반영 | `api-spec.md`(FAILED 상태, `failureReason`, 에러 코드), `README.md`, `DESIGN.md`(6. 예외 처리 및 장애 방지), `QA_LIST.md`(QA-D), `TEST_RESULT.md` |
+
+AI가 진행 중 판단하거나 보고한 사항
+
+- 완료 조건 1의 "정해진 횟수만큼 재시도"는 지시 사항 1에 재시도가 없어 적용하지 않음. 쿠폰 API는 1회 호출하고, 실패 시 실패 내역 저장과 에러 응답으로 처리하며 재시도는 클라이언트 재요청으로 함
+- 실패 응답 중 IO 오류·타임아웃은 HTTP 503으로 정함. 최초 프롬프트 4.2의 상태 코드 예시에는 503이 없지만, "잠시 후 다시 시도"할 일시 장애라 500과 구분함
+- IO 오류는 `UncheckedIOException`으로 올라온다고 가정함. 실제 HTTP 연동 시 Spring `RestClient`는 IO 오류를 `ResourceAccessException`으로 던지므로, 그 경우 IO 분기에 추가해야 503으로 응답됨 (현재는 "그 외 Exception"으로 500 + 실패 내역 저장)
+- 타임아웃 값은 실제 연동 시 HTTP 클라이언트의 연결·읽기 타임아웃으로 설정하는 것으로 두었고, 테스트는 읽기 타임아웃 예외(`SocketTimeoutException`)로 재현함
+- 쿠폰 호출이 DB 트랜잭션(락) 안에서 이뤄지는 구조는 그대로라, 쿠폰 시스템 응답이 늦으면 락 점유 시간이 길어질 수 있음 (DESIGN.md 한계에 기록)
+
+#### 5) 본인의 판단 (그대로 반영 / 수정하여 반영 / 반영하지 않음 / 추가 확인 후 결정)
+
+
+
+#### 6) 결과 검증
+
+| 완료 조건 | 검증 방법 | 결과 |
+|---|---|---|
+| 쿠폰 API IO 오류·타임아웃 → 보상 처리, 정의된 에러 코드·한글 메시지 | `FailureScenarioTest` QA-D03~D05·D07 (Mockito로 쿠폰 API 3종에 IO 오류·읽기 타임아웃·기타 예외 주입) | IO 오류·타임아웃은 503 `COUPON_COMMUNICATION_FAILED`, 기타 예외는 500 `COUPON_SYSTEM_ERROR`와 한글 메시지로 응답하고 보상 결과 `FAILED` 저장(롤백 안 됨). 회복 후 재요청하면 같은 리워드번호로 지급, 쿠폰 1개만 발급 |
+| for 문 변경 후 기존 테스트 결과 동일 | 전체 테스트 실행 (`gradlew.bat clean test`) | 기존 91개 모두 통과 (쿠폰 제외 후 재선정, 한도 소진, 동시 발급 포함). QA-F02만 실패 내역 저장에 맞춰 기대값 변경 |
+| 추가 실패 테스트 4종 통과 | `FailureScenarioTest`, `DatabaseFailureTest` | 애플리케이션 시스템 이슈(D01), DB 시스템 이슈(D06), 참여 기간 초과(D02), 쿠폰 통신 오류·보상 처리(D03~D05, D07) 모두 통과. 전체 98/98 |
+
+#### 7) 최종 반영 위치
+
+| 구분 | 파일 |
+|---|---|
+| 쿠폰 예외 처리·실패 내역 저장·반복문 | `reward/service/RewardService.java`, `reward/service/CouponFailureException.java`(신규), `reward/service/RewardFailedException.java`(신규) |
+| 보상 결과 | `reward/domain/Reward.java`(`markFailed`, `failure_reason`), `reward/domain/RewardStatus.java`(`FAILED`), `reward/dto/RewardResponse.java`(`failureReason`) |
+| 에러 코드·예외 처리 | `common/exception/ErrorCode.java`(`COUPON_COMMUNICATION_FAILED`, `DATABASE_ERROR`), `common/exception/GlobalExceptionHandler.java`(`DataAccessException`) |
+| 테스트 | `integration/FailureScenarioTest.java`(신규), `integration/DatabaseFailureTest.java`(신규), `integration/CouponIssueFallbackTest.java`(QA-F02) |
+| 문서 | `api-spec.md`, `README.md`, `DESIGN.md`, `test-or-verification/QA_LIST.md`, `TEST_RESULT.md` |
+
+(소스 경로 기준: `source-code/src/main/java/com/linepay/reward/`, 테스트: `test-or-verification/src/test/java/com/linepay/reward/`)
+
 ## 13.5 최종 회고
 
 > 이번 요청에서는 제외 (후속 작성 예정)
