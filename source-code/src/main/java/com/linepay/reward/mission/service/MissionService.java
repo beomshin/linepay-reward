@@ -110,7 +110,7 @@ public class MissionService {
             return Optional.of(ErrorCode.MISSION_NOT_IN_PERIOD);
         }
         // [DB] 미션 전체 참여 수 / 사용자 당일 참여 수 / 사용자 직전 참여 이력 조회
-        long totalCount = participationRepository.countByMission(missionId);
+        long totalCount = participationRepository.countByMissionId(missionId);
         long userDailyCount = participationRepository.countDailyByUser(missionId, userId, KstTime.toDate(now));
         LocalDateTime lastParticipatedAt = participationRepository.findLatestByUser(missionId, userId)
                 .map(MissionParticipation::getParticipatedAt)

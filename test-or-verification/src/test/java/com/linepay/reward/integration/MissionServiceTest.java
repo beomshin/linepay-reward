@@ -148,7 +148,7 @@ class MissionServiceTest extends IntegrationTestSupport {
         // 100번째 참여는 가능
         missionService.completeMission("USER_0001", "MISSION_0003");
 
-        assertThat(participationRepository.countByMission("MISSION_0003")).isEqualTo(100);
+        assertThat(participationRepository.countByMissionId("MISSION_0003")).isEqualTo(100);
         assertThat(errorOf(() -> missionService.completeMission("USER_0003", "MISSION_0003")))
                 .isEqualTo(ErrorCode.MISSION_TOTAL_LIMIT_EXCEEDED);
         assertThat(availableMissionIds("USER_0003")).containsExactly("MISSION_0002");
@@ -161,7 +161,7 @@ class MissionServiceTest extends IntegrationTestSupport {
         for (int i = 0; i < 5; i++) {
             errorOf(() -> missionService.completeMission("USER_0001", "MISSION_0002"));
         }
-        assertThat(participationRepository.countByMission("MISSION_0002")).isEqualTo(1);
+        assertThat(participationRepository.countByMissionId("MISSION_0002")).isEqualTo(1);
     }
 
     @Test

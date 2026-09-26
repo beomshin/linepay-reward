@@ -15,7 +15,8 @@ import java.util.Optional;
 /**
  * 미션 참여 이력 저장소.
  * <p>
- * 교정 3: 긴 JPA 메소드명을 JPQL(@Query)로 바꾸고, 조회 조건은 모두 아래 인덱스를 타도록 설계했다.
+ * 교정 3: 긴 JPA 메소드명은 JPQL(@Query)로 바꾸고, 짧고 명확한 조회(countByMissionId, findByParticipationNo)는
+ * JPA 메소드명 쿼리를 그대로 쓴다. 조회 조건은 모두 아래 인덱스를 타도록 설계했다.
  * <ul>
  *     <li>{@code idx_participation_mission_user_datetime} (mission_id, user_id, participated_date, participated_time)</li>
  *     <li>{@code uk_participation_no} (participation_no)</li>
@@ -24,8 +25,7 @@ import java.util.Optional;
 public interface MissionParticipationRepository extends JpaRepository<MissionParticipation, Long> {
 
     /** 미션 전체 참여 횟수 (인덱스 선두 컬럼 mission_id) */
-    @Query("select count(p) from MissionParticipation p where p.missionId = :missionId")
-    long countByMission(@Param("missionId") String missionId);
+    long countByMissionId(String missionId);
 
     /** 사용자의 특정 일자(yyyyMMdd, KST) 미션 참여 횟수 (mission_id, user_id, participated_date) */
     @Query("""
@@ -54,9 +54,8 @@ public interface MissionParticipationRepository extends JpaRepository<MissionPar
         return findRecentByUser(missionId, userId, PageRequest.of(0, 1)).stream().findFirst();
     }
 
-    /** 이력번호로 단건 조회 */
-    @Query("select p from MissionParticipation p where p.participationNo = :participationNo")
-    Optional<MissionParticipation> findByParticipationNo(@Param("participationNo") String participationNo);
+    /** 이력번호로 단건 조회 (uk_participation_no) */
+    Optional<MissionParticipation> findByParticipationNo(String participationNo);
 
     /**
      * 이력번호로 조회하면서 행에 비관적 쓰기 락을 건다.

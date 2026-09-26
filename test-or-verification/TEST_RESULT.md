@@ -1,6 +1,39 @@
 # 테스트 실행 결과
 
-## 0. 최신 실행 (교정 3 적용 후: 비즈니스 키 · JPQL 전환 · 인덱스)
+## 0. 최신 실행 (교정 3 조정: 과도한 적용 제외)
+
+| 항목 | 값 |
+|---|---|
+| 실행일 | 2026-09-26 (KST) |
+| 명령 | `gradlew.bat clean test bootJar` |
+| 결과 | **91개 전체 통과** |
+
+조정 내용
+
+- 로그 출력 검증 테스트(`TraceIdLoggingTest`, 4건)와 실행 계획 테스트(`ExplainPlanTest`, 7건)를 자동화 테스트에서 제외. 로그는 실제 서버 실행으로, 인덱스 사용은 아래 H2 `EXPLAIN` 결과로 한 번 확인한 것으로 대신함
+- `countByMissionId`, `findByParticipationNo`(참여 이력·보상 결과)는 JPQL 대신 JPA 메소드명 쿼리로 되돌림. 조회 조건은 같으므로 사용하는 인덱스도 같음
+
+| 테스트 클래스 | QA | 테스트 수 | 실패 |
+|---|---|---:|---:|
+| `unit.KstTimeTest` | QA-T | 3 | 0 |
+| `unit.ParticipationPolicyTest` | QA-P | 8 | 0 |
+| `unit.FakeCouponSystemTest` | QA-C | 8 | 0 |
+| `unit.TraceIdFilterTest` | QA-L | 5 | 0 |
+| `config.ProfileConfigTest` | QA-E | 6 | 0 |
+| `integration.MissionServiceTest` | QA-M | 12 | 0 |
+| `integration.RewardServiceTest` | QA-R | 13 | 0 |
+| `integration.CouponIssueFallbackTest` | QA-F | 2 | 0 |
+| `integration.ConcurrencyTest` | QA-X | 4 | 0 |
+| `integration.BusinessKeyTest` | QA-K | 6 | 0 |
+| `api.RewardApiTest` | QA-A | 8 | 0 |
+| `api.RequestValidationApiTest` | QA-V | 16 | 0 |
+| **합계** | | **91** | **0** |
+
+---
+
+## 이전 실행 기록 (교정 3)
+
+### 교정 3 적용 후: 비즈니스 키 · JPQL 전환 · 인덱스
 
 | 항목 | 값 |
 |---|---|

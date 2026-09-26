@@ -15,9 +15,8 @@
 | QA-A | `api/RewardApiTest` | API (MockMvc) |
 | QA-V | `api/RequestValidationApiTest` | API (MockMvc, 요청값 검증) |
 | QA-E | `config/ProfileConfigTest` | 단위 (프로파일 설정 분리) |
-| QA-L | `unit/TraceIdFilterTest`, `api/TraceIdLoggingTest` | 단위 + API (MDC traceId, 로그) |
+| QA-L | `unit/TraceIdFilterTest` | 단위 (MDC traceId) |
 | QA-K | `integration/BusinessKeyTest` | 통합 (비즈니스 키 채번, 유니크 제약) |
-| QA-I | `integration/ExplainPlanTest` | 통합 (실행 계획, 인덱스) |
 
 ## 1. 시간 기준 (과제 9절, 프롬프트 9절)
 
@@ -151,10 +150,6 @@
 | QA-L03 | 처리 중 예외가 나도 MDC 제거, 예외는 그대로 전달 |
 | QA-L04 | 요청마다 다른 traceId 발급 |
 | QA-L05 | 동시 요청 50건(스레드 8개 재사용): 요청 안에서는 traceId 유지, 요청 간 섞이지 않음, 시작 시 이전 값 없음 |
-| QA-L06 | 정상 요청의 `[REQ]`·`[USER]` 사용자 조회·`[MISSION]` 락 획득·참여 조건 검사·이력 저장·`[RES]` 로그에 같은 traceId, 요청 후 MDC 비워짐 |
-| QA-L07 | 예외 요청의 `[USER]` 조회 결과와 `[EXC]` 비즈니스 거절 로그(한글 메시지)에도 같은 traceId |
-| QA-L08 | 연속 두 요청의 로그가 각자 traceId로 구분되고 섞이지 않음 |
-| QA-L09 | 보상 지급 요청의 참여 이력 락 획득·기존 보상 조회·보상 아이템 조회·포인트 결정·결과 저장 로그가 한 traceId로 이어짐 |
 
 ## 12. 비즈니스 키 채번 / 유니크 제약 (교정 3)
 
@@ -167,20 +162,9 @@
 | QA-K05 | 같은 리워드번호 / 같은 참여 이력에 보상 결과 두 번 저장 → DB 유니크 제약 위반 |
 | QA-K06 | NO_REWARD 후 재요청하면 같은 리워드번호 유지 |
 
-## 13. 조회 쿼리 실행 계획 (교정 3: EXPLAIN)
-
-| ID | 조회 | 확인한 인덱스 |
-|---|---|---|
-| QA-I01 | 미션 전체 참여 수 | `idx_participation_mission_user_datetime` |
-| QA-I02 | 사용자 당일 참여 수 | `idx_participation_mission_user_datetime` |
-| QA-I03 | 사용자 직전 참여 1건 | `idx_participation_mission_user_datetime` |
-| QA-I04 | 이력번호 단건 조회 | `uk_participation_no` |
-| QA-I05 | 이력번호로 보상 결과 조회 | `uk_reward_participation_no` |
-| QA-I06 | 보상 아이템 조회 | `idx_mission_item_mission`, ORDER BY 없음 |
-| QA-I07 | 참여 기간 미션 조회 | `idx_mission_entry_period` |
-
-## 14. 검증하지 못한 범위
+## 13. 검증하지 못한 범위
 
 - 여러 애플리케이션 인스턴스와 공유 DB 환경에서의 동시성 (단일 JVM, H2에서만 검증)
 - 실제 HTTP 외부 쿠폰 시스템의 타임아웃·네트워크 오류 (재현체에서는 예외 주입으로만 확인)
 - 대량 데이터에서의 목록 조회 성능
+- 로그 출력 내용과 조회 쿼리의 인덱스 사용 여부는 자동화 테스트 대상에서 제외 (로그는 실제 서버 실행으로, 인덱스는 H2 `EXPLAIN`으로 한 번 확인. `TEST_RESULT.md` 참고)

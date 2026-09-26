@@ -133,18 +133,21 @@
 - 리워드번호는 첫 보상 요청 때 채번합니다. `NO_REWARD` 후 재요청하면 같은 리워드번호를 그대로 씁니다.
 - 한계: 시퀀스 값은 롤백돼도 되돌아가지 않아 번호 중간에 빈 값이 생길 수 있습니다. 일자 부분은 채번 시각(KST) 기준입니다.
 
-**JPQL 전환과 인덱스**
+**조회 메서드와 인덱스**
 
-| Repository 메서드 (JPQL) | 조건 | 사용 인덱스 (EXPLAIN 확인) |
-|---|---|---|
-| `countByMission` | mission_id | `idx_participation_mission_user_datetime` (선두 컬럼) |
-| `countDailyByUser` | mission_id, user_id, participated_date | `idx_participation_mission_user_datetime` |
-| `findRecentByUser` (+`findLatestByUser`, 1건) | mission_id, user_id, 일자·시간 역순 | `idx_participation_mission_user_datetime` |
-| `findByParticipationNo(ForUpdate)` | participation_no | `uk_participation_no` |
-| `RewardRepository.findByParticipationNo` | participation_no | `uk_reward_participation_no` |
-| `MissionItemRepository.findByMission` | mission_id, **정렬 없음** | `idx_mission_item_mission` |
-| `MissionRepository.findEntryPeriodMissions` | entry_start_date ≤ 오늘 ≤ entry_end_date | `idx_mission_entry_period` |
+| Repository 메서드 | 방식 | 조건 | 사용 인덱스 |
+|---|---|---|---|
+| `countByMissionId` | JPA 메소드명 | mission_id | `idx_participation_mission_user_datetime` (선두 컬럼) |
+| `countDailyByUser` | JPQL | mission_id, user_id, participated_date | `idx_participation_mission_user_datetime` |
+| `findRecentByUser` (+`findLatestByUser`, 1건) | JPQL | mission_id, user_id, 일자·시간 역순 | `idx_participation_mission_user_datetime` |
+| `findByParticipationNo` | JPA 메소드명 | participation_no | `uk_participation_no` |
+| `findByParticipationNoForUpdate` | JPQL + 비관적 락 | participation_no | `uk_participation_no` |
+| `RewardRepository.findByParticipationNo` | JPA 메소드명 | participation_no | `uk_reward_participation_no` |
+| `MissionItemRepository.findByMission` | JPQL | mission_id, **정렬 없음** | `idx_mission_item_mission` |
+| `MissionRepository.findEntryPeriodMissions` | JPQL | entry_start_date ≤ 오늘 ≤ entry_end_date | `idx_mission_entry_period` |
 
+- 메서드명이 짧고 의미가 분명한 조회(`countByMissionId`, `findByParticipationNo`)는 JPA 메소드명 쿼리를 그대로 쓰고, 조건이 길어 메서드명이 과도해지는 조회만 JPQL로 바꿨습니다.
+- 인덱스 사용 여부는 H2 `EXPLAIN`으로 한 번 확인했으며(결과는 `TEST_RESULT.md`), 자동화 테스트로는 두지 않았습니다.
 - 전체 미션 조회(`findAllByOrderByMissionIdAsc`)는 오늘 참여 기간에 걸친 미션만 일자 조건으로 먼저 거르고, 시·분·초 단위의 정확한 기간 판단은 참여 정책에서 합니다.
 - 보상 아이템 조회는 무작위 선택에 순서가 필요 없어 정렬을 뺐습니다. 무작위 선택은 인덱스가 아니라 아이템 자체를 고르도록(`RewardRandomizer.pick`) 바꿨습니다.
 - 직전 참여 조회는 PK 역순 조건을 뺐습니다. 같은 사용자·미션은 1시간 안에 다시 참여할 수 없어 일자·시간만으로 순서가 정해집니다.
@@ -164,7 +167,7 @@
 
 ## 8. 검증 방법
 
-- JUnit5 자동화 테스트 102개 (단위 24 / 통합 44 / API 28 / 설정 6)
+- JUnit5 자동화 테스트 91개 (단위 24 / 통합 37 / API 24 / 설정 6)
   - 단위: 참여 정책 경계값, KST 변환, 쿠폰 재현체 계약
   - 통합: 실제 H2·트랜잭션·락을 쓰는 미션/보상 시나리오, 시간 경과(MutableClock)
   - 동시성: 스레드 여러 개로 동시 요청 → 결과 건수 검증

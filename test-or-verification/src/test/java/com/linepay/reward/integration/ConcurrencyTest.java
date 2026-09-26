@@ -86,7 +86,7 @@ class ConcurrencyTest extends IntegrationTestSupport {
 
         assertThat(counts.get("SUCCESS").get()).isEqualTo(1);
         assertThat(counts.get(ErrorCode.MISSION_REENTRY_COOLDOWN).get()).isEqualTo(19);
-        assertThat(participationRepository.countByMission("MISSION_0002")).isEqualTo(1);
+        assertThat(participationRepository.countByMissionId("MISSION_0002")).isEqualTo(1);
     }
 
     @Test
@@ -103,7 +103,7 @@ class ConcurrencyTest extends IntegrationTestSupport {
 
         assertThat(counts.get("SUCCESS").get()).isEqualTo(100);
         assertThat(counts.get(ErrorCode.MISSION_TOTAL_LIMIT_EXCEEDED).get()).isEqualTo(30);
-        assertThat(participationRepository.countByMission("MISSION_0003")).isEqualTo(100);
+        assertThat(participationRepository.countByMissionId("MISSION_0003")).isEqualTo(100);
     }
 
     @Test
