@@ -417,6 +417,7 @@ AI가 진행 중 발견해 보고한 사항
 | 요청·응답·예외 로그 | `GlobalExceptionHandler` 로그에 `[EXC]` 접두어 추가. `MissionService`(`[MISSION]` 목록 조회 debug, 완료·거절 info), `RewardService`(`[REWARD]` 지급 결과, 중복 요청, 쿠폰 제외, 쿠폰 복구, 예상하지 못한 외부 결과) 로그 추가 |
 | 주석 | 미션 완료(락 획득 → 조건 검사 → 이력 생성), 보상 지급(락·소유자 확인 → 1회 지급 확인 → 선정·저장) 단계별 주석 추가. 설정 파일마다 프로파일 용도와 테스트용 설정 위치 주석 |
 | 테스트 추가 | `ProfileConfigTest`(QA-E01~E06, 6건), `TraceIdFilterTest`(QA-L01~L05, 5건), `TraceIdLoggingTest`(QA-L06~L08, 3건, 콘솔 로그 캡처) |
+| 운영 로그 강화 (본인 판단 반영) | API 요청 이후 DB 조회와 주요 서비스 로직마다 한글 INFO 로그 추가. `[USER]` 사용자 존재 조회, `[MISSION]` 전체 미션 조회·미션 락 획득·참여 조건 검사(전체/당일 참여 수, 직전 참여, 판정 결과)·참여 이력 저장, `[REWARD]` 참여 이력 락 획득·기존 보상 조회·보상 아이템 조회·후보 확정·무작위 선택·포인트 결정·결과 저장·결과 조회, `[COUPON]` 템플릿 조회·기존 발급 결과 조회·발급 요청/성공/거절. 필터(`[REQ]`/`[RES]`/`[ERR]`)와 예외(`[EXC]`) 로그도 한글로 변경. `TraceIdLoggingTest` 기대값 수정 및 QA-L09(보상 지급 흐름 로그) 추가 |
 | 문서 반영 | `README.md`(프로파일별 실행·설정 표, traceId 로그 예시), `DESIGN.md`(4. 운영 환경 대응), `api-spec.md`(`X-Trace-Id` 헤더), `QA_LIST.md`(QA-E, QA-L), `TEST_RESULT.md`, `.gitignore`(`logs/`) |
 
 AI가 진행 중 판단하거나 보고한 사항
@@ -428,7 +429,19 @@ AI가 진행 중 판단하거나 보고한 사항
 
 #### 5) 본인의 판단 (그대로 반영 / 수정하여 반영 / 반영하지 않음 / 추가 확인 후 결정)
 
+**수정하여 반영**
 
+| No | 판단 | 내용 |
+|:--:|---|---|
+| 1 | 일반적인 생성 케이스는 그대로 적용 | 프로파일 분리(공통/local/dev/prod), logback-spring.xml(개발 콘솔·운영 일자별 롤링 파일), `TraceIdFilter` MDC 설정·정리, 요청·응답·예외 로그는 AI 결과를 그대로 반영함 |
+| 2 | 서비스 운영 시 이슈 확인을 위한 로그 강화 | AI 결과는 요청 시작·종료와 일부 결과 로그만 있어, 운영 중 문제가 생겼을 때 요청 안에서 어느 단계까지 처리됐는지 확인하기 어렵다고 판단함. API 요청이 들어온 뒤 DB 조회와 주요 서비스 로직을 수행할 때마다 한글 로그를 남기도록 추가 지시하여 반영함 |
+
+추가 지시 원문
+
+```
+서비스 운영 시 이슈 확인을 위한 로그 강화
+API 요청이 들어오고 일반적으로 DB조회 혹은 중요 서비스 로직 수행시 각 로깅을 추가 (한글)
+```
 
 #### 6) 결과 검증
 
@@ -445,6 +458,7 @@ AI가 진행 중 판단하거나 보고한 사항
 | 1 | 컴파일 실패 | 테스트 람다 안 `Thread.sleep`의 `InterruptedException` 미처리 → `LockSupport.parkNanos`로 교체 |
 | 2 | 87/87 통과 | prod 기동 시 콘솔에 logback 경고(`Appender named [CONSOLE] not referenced`) → 콘솔 appender를 `!prod` 블록 안으로 이동 |
 | 3 | 87/87 통과 | prod 콘솔 경고 없음, 프로파일별 출력 위치 재확인 |
+| 4 | 88/88 통과 | 운영 로그 강화 후 재실행. 로그 문구 변경에 따라 QA-L06~L08 기대값 수정, QA-L09 추가. 실제 서버에서 미션 완료·보상 지급 요청의 단계별 한글 로그가 같은 traceId로 이어지는 것을 확인 (`TEST_RESULT.md` 로그 예시) |
 
 #### 7) 최종 반영 위치
 
@@ -453,7 +467,7 @@ AI가 진행 중 판단하거나 보고한 사항
 | 환경 설정 | `source-code/src/main/resources/application.yml`, `application-local.yml`(신규), `application-dev.yml`(신규), `application-prod.yml`(신규) |
 | 로그 설정 | `source-code/src/main/resources/logback-spring.xml`(신규) |
 | 요청 추적 | `common/logging/TraceIdFilter.java`(신규) |
-| 로그·주석 | `common/exception/GlobalExceptionHandler.java`, `mission/service/MissionService.java`, `reward/service/RewardService.java` |
+| 로그·주석 | `common/exception/GlobalExceptionHandler.java`, `mission/service/MissionService.java`, `reward/service/RewardService.java`, `user/UserValidator.java` |
 | 테스트 | `config/ProfileConfigTest.java`, `unit/TraceIdFilterTest.java`, `api/TraceIdLoggingTest.java` (모두 신규) |
 | 문서 | `README.md`, `DESIGN.md`, `api-spec.md`, `test-or-verification/QA_LIST.md`, `TEST_RESULT.md`, `.gitignore` |
 

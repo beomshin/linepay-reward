@@ -36,15 +36,18 @@ class TraceIdLoggingTest extends IntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("QA-L06 정상 요청: 요청·비즈니스·응답 로그에 같은 traceId 가 찍히고, 요청 후 MDC 가 비워진다")
+    @DisplayName("QA-L06 정상 요청: 요청·DB 조회·비즈니스·응답 로그에 같은 traceId 가 찍히고, 요청 후 MDC 가 비워진다")
     void sameTraceIdInRequestLogs(CapturedOutput output) throws Exception {
         String traceId = mockMvc.perform(post("/linepay/v1/mission/USER_0001/MISSION_0003/complete"))
                 .andReturn().getResponse().getHeader(TraceIdFilter.TRACE_ID_HEADER);
 
         List<String> lines = linesOf(output, traceId);
-        assertThat(lines).anyMatch(l -> l.contains("[REQ] POST /linepay/v1/mission/USER_0001/MISSION_0003/complete"));
-        assertThat(lines).anyMatch(l -> l.contains("[MISSION] completed"));
-        assertThat(lines).anyMatch(l -> l.contains("[RES] POST /linepay/v1/mission/USER_0001/MISSION_0003/complete status=200"));
+        assertThat(lines).anyMatch(l -> l.contains("[REQ] 요청 시작 - POST /linepay/v1/mission/USER_0001/MISSION_0003/complete"));
+        assertThat(lines).anyMatch(l -> l.contains("[USER] 사용자 조회 userId=USER_0001 존재여부=true"));
+        assertThat(lines).anyMatch(l -> l.contains("[MISSION] 미션 락 획득 missionId=MISSION_0003"));
+        assertThat(lines).anyMatch(l -> l.contains("[MISSION] 참여 조건 검사 missionId=MISSION_0003") && l.contains("결과=참여가능"));
+        assertThat(lines).anyMatch(l -> l.contains("[MISSION] 참여 이력 저장 완료"));
+        assertThat(lines).anyMatch(l -> l.contains("[RES] 요청 종료 - POST /linepay/v1/mission/USER_0001/MISSION_0003/complete 상태=200"));
         assertThat(MDC.get(TraceIdFilter.TRACE_ID)).isNull();
     }
 
@@ -55,8 +58,9 @@ class TraceIdLoggingTest extends IntegrationTestSupport {
                 .andReturn().getResponse().getHeader(TraceIdFilter.TRACE_ID_HEADER);
 
         List<String> lines = linesOf(output, traceId);
-        assertThat(lines).anyMatch(l -> l.contains("[EXC] business rejected: USER_NOT_FOUND"));
-        assertThat(lines).anyMatch(l -> l.contains("status=404"));
+        assertThat(lines).anyMatch(l -> l.contains("[USER] 사용자 조회 userId=USER_9999 존재여부=false"));
+        assertThat(lines).anyMatch(l -> l.contains("[EXC] 비즈니스 거절: USER_NOT_FOUND (사용자를 찾을 수 없습니다.)"));
+        assertThat(lines).anyMatch(l -> l.contains("상태=404"));
     }
 
     @Test
@@ -69,9 +73,28 @@ class TraceIdLoggingTest extends IntegrationTestSupport {
 
         assertThat(first).isNotEqualTo(second);
         // 첫 요청은 성공, 두 번째는 1시간 재참여 제한 → 각 결과 로그가 자기 traceId 에만 있어야 한다
-        assertThat(linesOf(output, first)).anyMatch(l -> l.contains("[MISSION] completed"))
+        assertThat(linesOf(output, first)).anyMatch(l -> l.contains("[MISSION] 참여 이력 저장 완료"))
                 .noneMatch(l -> l.contains("MISSION_REENTRY_COOLDOWN"));
-        assertThat(linesOf(output, second)).anyMatch(l -> l.contains("MISSION_REENTRY_COOLDOWN"))
-                .noneMatch(l -> l.contains("[MISSION] completed"));
+        assertThat(linesOf(output, second)).anyMatch(l -> l.contains("[MISSION] 참여 불가") && l.contains("MISSION_REENTRY_COOLDOWN"))
+                .noneMatch(l -> l.contains("[MISSION] 참여 이력 저장 완료"));
+    }
+
+    @Test
+    @DisplayName("QA-L09 보상 지급 요청: DB 조회·보상 선정·저장 단계 로그가 한 traceId 로 이어진다")
+    void rewardFlowLogs(CapturedOutput output) throws Exception {
+        String body = mockMvc.perform(post("/linepay/v1/mission/USER_0001/MISSION_0003/complete"))
+                .andReturn().getResponse().getContentAsString();
+        String participationId = body.replaceAll(".*\"participationId\":(\\d+).*", "$1");
+
+        String traceId = mockMvc.perform(post("/linepay/v1/reward/USER_0001/" + participationId))
+                .andReturn().getResponse().getHeader(TraceIdFilter.TRACE_ID_HEADER);
+
+        List<String> lines = linesOf(output, traceId);
+        assertThat(lines).anyMatch(l -> l.contains("[REWARD] 보상 지급 요청 시작"));
+        assertThat(lines).anyMatch(l -> l.contains("[REWARD] 참여 이력 락 획득 participationId=" + participationId));
+        assertThat(lines).anyMatch(l -> l.contains("[REWARD] 기존 보상 결과 조회") && l.contains("상태=없음"));
+        assertThat(lines).anyMatch(l -> l.contains("[REWARD] 보상 아이템 조회 missionId=MISSION_0003"));
+        assertThat(lines).anyMatch(l -> l.contains("[REWARD] 포인트 지급 결정"));
+        assertThat(lines).anyMatch(l -> l.contains("[REWARD] 보상 결과 저장 완료") && l.contains("상태=GRANTED"));
     }
 }

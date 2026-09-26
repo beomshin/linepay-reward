@@ -41,13 +41,13 @@ public class TraceIdFilter extends OncePerRequestFilter {
 
         long startedAt = System.currentTimeMillis();
         String api = request.getMethod() + " " + request.getRequestURI();
-        log.info("[REQ] {}", api);
+        log.info("[REQ] 요청 시작 - {}", api);
         try {
             chain.doFilter(request, response);
-            log.info("[RES] {} status={} elapsed={}ms", api, response.getStatus(), System.currentTimeMillis() - startedAt);
+            log.info("[RES] 요청 종료 - {} 상태={} 처리시간={}ms", api, response.getStatus(), System.currentTimeMillis() - startedAt);
         } catch (Exception e) {
             // 전역 예외 핸들러에서 처리되지 못하고 필터까지 올라온 예외
-            log.error("[ERR] {} elapsed={}ms", api, System.currentTimeMillis() - startedAt, e);
+            log.error("[ERR] 처리되지 않은 예외 - {} 처리시간={}ms", api, System.currentTimeMillis() - startedAt, e);
             throw e;
         } finally {
             MDC.remove(TRACE_ID);

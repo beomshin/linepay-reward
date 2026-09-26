@@ -27,9 +27,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException e) {
         if (e.getErrorCode().getHttpStatus().is5xxServerError()) {
-            log.error("[EXC] business error: {}", e.getErrorCode(), e);
+            log.error("[EXC] 서버 오류: {} ({})", e.getErrorCode(), e.getErrorCode().getMessage(), e);
         } else {
-            log.info("[EXC] business rejected: {}", e.getErrorCode());
+            log.info("[EXC] 비즈니스 거절: {} ({})", e.getErrorCode(), e.getErrorCode().getMessage());
         }
         return toResponse(e.getErrorCode());
     }
@@ -71,19 +71,21 @@ public class GlobalExceptionHandler {
     /** 정의되지 않은 경로 */
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleNotFound(NoResourceFoundException e) {
+        log.info("[EXC] 정의되지 않은 API 경로: {}", e.getResourcePath());
         return toResponse(ErrorCode.API_NOT_FOUND);
     }
 
     /** 지원하지 않는 HTTP Method */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ApiResponse<Void>> handleMethodNotAllowed(HttpRequestMethodNotSupportedException e) {
+        log.info("[EXC] 지원하지 않는 HTTP 메서드: {}", e.getMethod());
         return toResponse(ErrorCode.METHOD_NOT_ALLOWED);
     }
 
     /** 그 외 예상하지 못한 오류 */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnexpected(Exception e) {
-        log.error("[EXC] unexpected error", e);
+        log.error("[EXC] 예상하지 못한 오류", e);
         return toResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     }
 
@@ -100,7 +102,7 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<ApiResponse<Void>> toValidationResponse(ErrorCode errorCode, String field) {
-        log.info("[EXC] request validation failed: {} field={}", errorCode, field);
+        log.info("[EXC] 요청값 검증 실패: {} 필드={}", errorCode, field);
         return ResponseEntity.status(errorCode.getHttpStatus()).body(ApiResponse.fail(errorCode, field));
     }
 

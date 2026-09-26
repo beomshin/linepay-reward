@@ -75,12 +75,41 @@ java -jar build/libs/linepay-reward-0.0.1.jar --spring.profiles.active=prod
 ### 요청 추적 로그 (traceId)
 
 - 요청마다 traceId를 만들어 MDC에 넣고, 모든 로그 라인에 `[traceId]`로 출력합니다. 같은 값을 응답 헤더 `X-Trace-Id`로도 돌려줍니다.
-- API 요청(`[REQ]`)·응답(`[RES]` 상태 코드, 처리 시간)·예외(`[EXC]`)·비즈니스(`[MISSION]`, `[REWARD]`) 로그를 남깁니다.
+- 로그는 한글로 남기며, 접두어로 단계를 구분합니다.
+
+| 접두어 | 내용 |
+|---|---|
+| `[REQ]` / `[RES]` / `[ERR]` | API 요청 시작, 요청 종료(상태 코드·처리 시간), 필터까지 올라온 예외 |
+| `[USER]` | 사용자 존재 여부 DB 조회 |
+| `[MISSION]` | 미션 조회, 미션 락 획득, 참여 조건 검사(전체·당일 참여 수, 직전 참여), 참여 이력 저장 |
+| `[REWARD]` | 참여 이력 락 획득, 기존 보상 조회, 보상 아이템 조회, 후보 확정, 무작위 선택, 결과 저장 |
+| `[COUPON]` | 외부 쿠폰 템플릿 조회, 기존 발급 결과 조회, 쿠폰 발급 요청·성공·거절 |
+| `[EXC]` | 비즈니스 거절, 요청값 검증 실패, 서버 오류 |
+
+미션 완료 → 보상 지급 요청 로그 예 (traceId 일부 생략)
 
 ```
-2026-09-26 10:00:41.123 INFO  [79b10881ec264eb0b027bfad03d4fb21] [http-nio-8080-exec-2] c.l.r.common.logging.TraceIdFilter - [REQ] POST /linepay/v1/mission/USER_0001/MISSION_0003/complete
-2026-09-26 10:00:41.170 INFO  [79b10881ec264eb0b027bfad03d4fb21] [http-nio-8080-exec-2] c.l.r.mission.service.MissionService - [MISSION] completed userId=USER_0001 missionId=MISSION_0003 participationId=1
-2026-09-26 10:00:41.176 INFO  [79b10881ec264eb0b027bfad03d4fb21] [http-nio-8080-exec-2] c.l.r.common.logging.TraceIdFilter - [RES] POST /linepay/v1/mission/USER_0001/MISSION_0003/complete status=200 elapsed=53ms
+INFO  [d6b6...] [REQ] 요청 시작 - POST /linepay/v1/mission/USER_0002/MISSION_0002/complete
+INFO  [d6b6...] [MISSION] 미션 완료 처리 시작 userId=USER_0002 missionId=MISSION_0002
+INFO  [d6b6...] [USER] 사용자 조회 userId=USER_0002 존재여부=true
+INFO  [d6b6...] [MISSION] 미션 락 획득 missionId=MISSION_0002 참여기간=2026-05-01T00:00~2027-01-01T00:00
+INFO  [d6b6...] [MISSION] 참여 조건 검사 missionId=MISSION_0002 userId=USER_0002 전체참여=0 당일참여=0 직전참여=null 결과=참여가능
+INFO  [d6b6...] [MISSION] 참여 이력 저장 완료 userId=USER_0002 missionId=MISSION_0002 participationId=1 참여일시=2026-09-01T12:00
+INFO  [d6b6...] [RES] 요청 종료 - POST /linepay/v1/mission/USER_0002/MISSION_0002/complete 상태=200 처리시간=64ms
+
+INFO  [99a1...] [REQ] 요청 시작 - POST /linepay/v1/reward/USER_0002/1
+INFO  [99a1...] [REWARD] 보상 지급 요청 시작 userId=USER_0002 participationId=1
+INFO  [99a1...] [USER] 사용자 조회 userId=USER_0002 존재여부=true
+INFO  [99a1...] [REWARD] 참여 이력 락 획득 participationId=1 missionId=MISSION_0002
+INFO  [99a1...] [REWARD] 기존 보상 결과 조회 participationId=1 상태=없음
+INFO  [99a1...] [REWARD] 보상 아이템 조회 missionId=MISSION_0002 건수=2 아이템=[ITEM_0002(REWARD_POINT), ITEM_0003(COUPON)]
+INFO  [99a1...] [COUPON] 기존 발급 결과 조회 requestId=REWARD_1_COUPON_TEMPLATE_0001 결과=없음
+INFO  [99a1...] [COUPON] 쿠폰 템플릿 조회 couponTemplateId=COUPON_TEMPLATE_0001 상태=AVAILABLE 발급수량=0/100 발급가능=true
+INFO  [99a1...] [REWARD] 지급 후보 확정 건수=2 후보=[ITEM_0002, ITEM_0003]
+INFO  [99a1...] [REWARD] 보상 아이템 무작위 선택 아이템=ITEM_0002 유형=REWARD_POINT (후보 2건 중)
+INFO  [99a1...] [REWARD] 포인트 지급 결정 포인트=5
+INFO  [99a1...] [REWARD] 보상 결과 저장 완료 participationId=1 상태=GRANTED 아이템=ITEM_0002 유형=REWARD_POINT 포인트=5 couponId=null
+INFO  [99a1...] [RES] 요청 종료 - POST /linepay/v1/reward/USER_0002/1 상태=200 처리시간=33ms
 ```
 
 ### 기준 시각 (local)

@@ -6,7 +6,7 @@
 |---|---|
 | 실행일 | 2026-09-26 (KST) |
 | 명령 | `gradlew.bat clean test bootJar` |
-| 결과 | **87개 전체 통과** (기존 73 + 설정 분리 6 + 요청 추적 8) |
+| 결과 | **88개 전체 통과** (기존 73 + 설정 분리 6 + 요청 추적·로그 9) |
 
 | 테스트 클래스 | QA | 테스트 수 | 실패 |
 |---|---|---:|---:|
@@ -21,8 +21,8 @@
 | `integration.ConcurrencyTest` | QA-X | 4 | 0 |
 | `api.RewardApiTest` | QA-A | 8 | 0 |
 | `api.RequestValidationApiTest` | QA-V | 15 | 0 |
-| `api.TraceIdLoggingTest` | QA-L | 3 | 0 |
-| **합계** | | **87** | **0** |
+| `api.TraceIdLoggingTest` | QA-L | 4 | 0 |
+| **합계** | | **88** | **0** |
 
 ### 프로파일별 기동 확인 (`java -jar ... --spring.profiles.active=<프로파일>`)
 
@@ -49,6 +49,33 @@
 | 1회차 | 컴파일 실패 | 테스트의 `FilterChain` 람다 안에서 `Thread.sleep`의 `InterruptedException`을 처리하지 않음 | `LockSupport.parkNanos`로 교체 |
 | 2회차 | 87/87 통과 | prod 기동 시 콘솔에 logback 경고 `Appender named [CONSOLE] not referenced` 출력 | 콘솔 appender 정의를 `!prod` 프로파일 블록 안으로 이동 |
 | 3회차 | 87/87 통과 | prod 콘솔 경고 없음 확인 | - |
+| 4회차 | 88/88 통과 | 운영 로그 강화: DB 조회·주요 로직 단계별 한글 로그 추가, 로그 문구 변경에 맞춰 QA-L06~L08 기대값 수정, QA-L09 추가 | 실제 서버(local)에서 미션 완료·보상 지급 요청 로그 확인 (아래 예시) |
+
+운영 로그 강화 후 실제 서버 로그 (local, traceId 일부 생략)
+
+```
+INFO  [d6b6...] [REQ] 요청 시작 - POST /linepay/v1/mission/USER_0002/MISSION_0002/complete
+INFO  [d6b6...] [MISSION] 미션 완료 처리 시작 userId=USER_0002 missionId=MISSION_0002
+INFO  [d6b6...] [USER] 사용자 조회 userId=USER_0002 존재여부=true
+INFO  [d6b6...] [MISSION] 미션 락 획득 missionId=MISSION_0002 참여기간=2026-05-01T00:00~2027-01-01T00:00
+INFO  [d6b6...] [MISSION] 참여 조건 검사 missionId=MISSION_0002 userId=USER_0002 전체참여=0 당일참여=0 직전참여=null 결과=참여가능
+INFO  [d6b6...] [MISSION] 참여 이력 저장 완료 userId=USER_0002 missionId=MISSION_0002 participationId=1 참여일시=2026-09-01T12:00
+INFO  [d6b6...] [RES] 요청 종료 - POST /linepay/v1/mission/USER_0002/MISSION_0002/complete 상태=200 처리시간=64ms
+
+INFO  [99a1...] [REQ] 요청 시작 - POST /linepay/v1/reward/USER_0002/1
+INFO  [99a1...] [REWARD] 보상 지급 요청 시작 userId=USER_0002 participationId=1
+INFO  [99a1...] [USER] 사용자 조회 userId=USER_0002 존재여부=true
+INFO  [99a1...] [REWARD] 참여 이력 락 획득 participationId=1 missionId=MISSION_0002
+INFO  [99a1...] [REWARD] 기존 보상 결과 조회 participationId=1 상태=없음
+INFO  [99a1...] [REWARD] 보상 아이템 조회 missionId=MISSION_0002 건수=2 아이템=[ITEM_0002(REWARD_POINT), ITEM_0003(COUPON)]
+INFO  [99a1...] [COUPON] 기존 발급 결과 조회 requestId=REWARD_1_COUPON_TEMPLATE_0001 결과=없음
+INFO  [99a1...] [COUPON] 쿠폰 템플릿 조회 couponTemplateId=COUPON_TEMPLATE_0001 상태=AVAILABLE 발급수량=0/100 발급가능=true
+INFO  [99a1...] [REWARD] 지급 후보 확정 건수=2 후보=[ITEM_0002, ITEM_0003]
+INFO  [99a1...] [REWARD] 보상 아이템 무작위 선택 아이템=ITEM_0002 유형=REWARD_POINT (후보 2건 중)
+INFO  [99a1...] [REWARD] 포인트 지급 결정 포인트=5
+INFO  [99a1...] [REWARD] 보상 결과 저장 완료 participationId=1 상태=GRANTED 아이템=ITEM_0002 유형=REWARD_POINT 포인트=5 couponId=null
+INFO  [99a1...] [RES] 요청 종료 - POST /linepay/v1/reward/USER_0002/1 상태=200 처리시간=33ms
+```
 
 ---
 
