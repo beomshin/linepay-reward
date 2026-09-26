@@ -7,6 +7,7 @@
  *
  * 사용 기술: Java 21, Spring Boot, Gradle, H2, JUnit5
  *           + Lombok(반복 코드 제거), Spring Validation(요청값 검증)  ← 교정 1
+ *           + Spring Cache + Caffeine(일자별 미션 조회 캐싱)           ← 교정 5
  */
 plugins {
     id 'java'
@@ -43,6 +44,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     // 요청값 선언적 검증 (Bean Validation)
     implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // 일자별 미션 조회 캐싱 (Spring Cache 추상화 + Caffeine 로컬 캐시, TTL 지원)  ← 교정 5
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation 'com.github.ben-manes.caffeine:caffeine'
     runtimeOnly 'com.h2database:h2'
 
     // Lombok: Getter·생성자 등 반복 코드 제거 (컴파일 시점에만 사용)

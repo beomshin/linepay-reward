@@ -27,6 +27,14 @@ spring:
       encoding: UTF-8
   jackson:
     time-zone: Asia/Seoul
+  # 일자별 미션 조회 캐시 (교정 5)
+  #  - entryPeriodMissions: 키 = 조회 일자(yyyyMMdd), 값 = 그날 참여 기간에 걸친 미션 목록
+  #  - expireAfterWrite=10m: 만료 시간(TTL). 미션 데이터 변경은 최대 10분 뒤 반영된다 (별도 무효화 처리 없음)
+  cache:
+    type: caffeine
+    cache-names: entryPeriodMissions
+    caffeine:
+      spec: maximumSize=100,expireAfterWrite=10m
 
 server:
   port: 8080

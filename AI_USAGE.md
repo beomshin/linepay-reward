@@ -536,7 +536,22 @@ AI가 진행 중 판단하거나 보고한 사항
 
 #### 5) 본인의 판단 (그대로 반영 / 수정하여 반영 / 반영하지 않음 / 추가 확인 후 결정)
 
+**수정하여 반영**
 
+| No | 수정 내용 | 판단 근거 |
+|:--:|---|---|
+| 1 | 과도한 테스트 코드 제거 | 로그 출력 내용과 실행 계획(EXPLAIN)을 JUnit으로 검증하는 테스트(`ExplainPlanTest` 등)는 기능 검증이 아닌 확인용이라 과도하다고 판단함. 자동화 테스트에서 제외하고, 로그는 실제 서버 실행으로, 인덱스 사용 여부는 H2 `EXPLAIN`으로 한 번 확인한 결과만 `TEST_RESULT.md`에 남김 |
+| 2 | 과도한 JPQL 설정은 JPA로 변경 | 교정 사유는 "과도하게 긴 JPA 메소드명"이었으나 AI가 모든 조회 메서드를 `@Query`로 전환함. 조건이 단순한 전체 참여 수 조회(`countByMissionId`)와 이력번호 조회(`findByParticipationNo`)는 JPA 메소드명으로도 짧고 명확하므로 JPA 메소드로 되돌리고, 길고 복잡한 조회만 JPQL로 유지 |
+
+그 밖의 결과(비즈니스 키·DB 시퀀스 채번·유니크 제약, 인덱스 설계, 전체 조회·불필요한 정렬 제거)는 그대로 반영함.
+
+추가 지시 원문
+
+```
+과도한 적용 사항 제외
+1. 로그, 실행계획 Junit 테스트 제외
+2. countByMissionId, findByParticipationNo 경우 JPA 활용 처리
+```
 
 #### 6) 결과 검증
 
@@ -635,7 +650,7 @@ AI가 진행 중 판단하거나 보고한 사항
 
 #### 5) 본인의 판단 (그대로 반영 / 수정하여 반영 / 반영하지 않음 / 추가 확인 후 결정)
 
-
+**그대로 반영**
 
 #### 6) 결과 검증
 
@@ -654,6 +669,112 @@ AI가 진행 중 판단하거나 보고한 사항
 | 에러 코드·예외 처리 | `common/exception/ErrorCode.java`(`COUPON_COMMUNICATION_FAILED`, `DATABASE_ERROR`), `common/exception/GlobalExceptionHandler.java`(`DataAccessException`) |
 | 테스트 | `integration/FailureScenarioTest.java`(신규), `integration/DatabaseFailureTest.java`(신규), `integration/CouponIssueFallbackTest.java`(QA-F02) |
 | 문서 | `api-spec.md`, `README.md`, `DESIGN.md`, `test-or-verification/QA_LIST.md`, `TEST_RESULT.md` |
+
+(소스 경로 기준: `source-code/src/main/java/com/linepay/reward/`, 테스트: `test-or-verification/src/test/java/com/linepay/reward/`)
+
+### 교정 기록 5. 대용량 트래픽 대응 (조회 캐싱 적용 · 동시성 제어 성능 검증)
+
+#### 1) 교정 기록 제목
+
+대용량 트래픽 대응: 일자별 미션 조회 캐싱(일자 키, TTL, 변경 시 무효화) 적용과 동시성 제어 락의 성능 측정·정합성 검증 테스트 추가
+
+#### 2) 교정이 필요하다고 판단한 이유
+
+- `findEntryPeriodMissions` 일자별 미션 조회는 호출 빈도가 높은데 요청마다 DB를 조회하여, 트래픽이 많아지면 DB 부하와 응답 지연이 생길 수 있음
+- 적용한 동시성 제어 락(미션·참여 이력 비관적 락)이 트래픽 증가 시 병목이 되는지 판단할 근거가 없음
+- 캐싱과 락의 효과를 수치로 확인하는 테스트가 없어 개선 효과를 판단하기 어려움
+
+#### 3) AI에 전달한 후속 지시 원문
+
+세션 지시: `교정 기록 5번째 사항 적용 및 기록 처리`
+
+전달한 교정 프롬프트(`교정_5_캐싱_동시성성능_프롬프트.md`) 원문:
+
+````markdown
+# 대용량 트래픽 대응 (조회 캐싱 적용 · 동시성 제어 성능 검증)
+
+조회 빈도가 높은 일자별 미션 조회에 캐싱을 적용해 DB 조회를 최소화하고, 동시성 제어 락이 트래픽 증가 시 병목이 되지 않는지 테스트로 검증해 주세요.
+
+## 교정 사유
+1. `findEntryPeriodMissions` 일자별 미션 조회는 호출 빈도가 높은데, 요청마다 DB를 조회하여 대용량 트래픽 시 DB 부하와 응답 지연이 발생할 수 있음
+2. 적용된 동시성 제어 락 방식이 트래픽 증가 시 병목이 되는지 확인할 수 있는 근거가 없음
+3. 캐싱과 락의 성능을 수치로 검증하는 테스트가 없어 개선 효과를 판단하기 어려움
+
+## 지시 사항
+1. `findEntryPeriodMissions` 일자별 미션 조회에 일자를 캐시 키로 하는 캐싱을 적용하여 DB 조회를 최소화하고, 캐시 만료 시간(TTL)과 미션 데이터 변경 시 캐시 무효화 처리를 함께 적용
+2. 동시성 제어 락이 걸린 상황의 성능을 확인하기 위해, 다수 스레드가 동시에 같은 미션에 참여·완료 요청하는 테스트 코드를 작성
+3. 테스트에서 처리 시간, 처리 건수, 락 대기로 인한 실패 건수를 측정하여 결과로 보고하고, 데이터 정합성(중복 참여·중복 보상 없음)도 함께 검증
+
+## 완료 조건
+1. 같은 일자로 반복 조회 시 첫 요청만 DB를 조회하고 이후 요청은 캐시에서 응답하는지, 미션 데이터 변경 시 캐시가 갱신되는지 확인
+2. 동시 요청 테스트에서 중복 참여·중복 보상 없이 정합성이 유지되는지 확인
+3. 동시 요청 수에 따른 처리 시간과 실패 건수를 측정하여 락으로 인한 병목 여부를 수치로 확인
+````
+
+#### 4) AI의 결과
+
+| 지시 사항 | AI 결과 |
+|---|---|
+| 일자 키 캐싱 | `spring-boot-starter-cache` + Caffeine 의존성 추가, `CacheConfig`(`@EnableCaching`) 추가. `MissionRepository.findEntryPeriodMissions`에 `@Cacheable(cacheNames = "entryPeriodMissions", key = "#p0")` 적용 (키 = 조회 일자 `yyyyMMdd`) |
+| 캐시 만료 시간(TTL) | `application.yml`에 `spring.cache.caffeine.spec: maximumSize=100,expireAfterWrite=10m` (저장 후 10분) |
+| 미션 변경 시 무효화 | `MissionRepository`의 `save`·`saveAll`·`delete`·`deleteById`를 재선언하고 `@CacheEvict(allEntries = true)` 적용. 미션 한 건이 여러 일자 조회에 걸리므로 캐시 전체를 비움 |
+| 동시 참여·완료 테스트 | `LockPerformanceTest`(QA-S) 추가. QA-S01: 같은 미션에 서로 다른 사용자 10/50/100/200명 동시 완료. QA-S02: 100명 완료 후 이력마다 보상 요청 2번씩(200건) 동시 전송. QA-S03: 같은 미션 100건과 서로 다른 미션 10개 × 10건 비교 |
+| 측정·보고 | 전체 처리 시간, TPS, 요청당 평균·최대 응답 시간, 성공 건수, 정책상 거절 건수(에러 코드별), 락 대기 실패 건수(`PessimisticLockingFailureException`), 기타 실패 건수를 `[PERF]` 로그 표로 출력하고 `TEST_RESULT.md`에 기록 |
+| 정합성 검증 | 사용자별 참여 1건(중복 참여 없음), 참여 이력당 보상 1건(중복 보상 없음), 발급 쿠폰 수 = 쿠폰 지급 보상 수, 락 대기·기타 실패 0건 |
+| 캐싱 테스트 | `MissionCacheTest`(QA-H01~H05). Hibernate 통계의 쿼리 실행 횟수로 같은 일자 3번 조회 시 DB 조회 1 → 0 → 0회, 일자별 키 분리, 미션 추가·삭제 시 무효화, TTL 10분 설정 확인 |
+| 문서 반영 | `README.md`, `DESIGN.md`(7. 대용량 트래픽 대응), `api-spec.md`(2.1 캐싱 안내), `QA_LIST.md`(QA-H, QA-S), `TEST_RESULT.md`(측정 결과) |
+
+측정 결과 (H2 In-memory, 커넥션 풀 기본 10개)
+
+| 구분 | 요청 수 | 전체 처리 시간 | 성공 | 정책상 거절 | 락 대기 실패 | 평균 응답 |
+|---|---:|---:|---:|---|---:|---:|
+| 같은 미션 완료 | 10 / 50 / 100 / 200 | 59 / 168 / 283 / 377 ms | 10 / 50 / 100 / 100 | 200건 중 100건 전체 한도 초과 | 0 | 35 / 87 / 138 / 196 ms |
+| 보상 요청 (이력 100건 × 2번) | 200 | 97 ms | 100 | 100건 이미 지급 | 0 | 44 ms |
+| 같은 미션 1개 vs 서로 다른 미션 10개 | 100 / 100 | 145 / 53 ms | 100 / 100 | 0 | 0 | 72 / 26 ms |
+
+AI가 진행 중 판단하거나 보고한 사항
+
+- 캐싱은 서비스가 아니라 리포지토리 메서드에 적용함. 서비스 내부 호출은 캐시 프록시를 거치지 않아서이며, 지시 사항이 `findEntryPeriodMissions`를 대상으로 지정함
+- 캐시 구현은 Caffeine 로컬 캐시로 정함. 과제 실행 조건상 Redis 같은 외부 인프라를 쓰지 않기 때문이며, 여러 인스턴스 환경에서는 미션 변경이 다른 인스턴스에 최대 TTL(10분)만큼 늦게 반영됨 (DESIGN.md 한계에 기록)
+- 캐시에는 일자 조건까지만 담고, 시각 단위 기간 판단·참여 횟수·재참여 검사는 캐시 밖에서 매번 하므로 응답 내용은 캐싱 전과 같음
+- 현재 미션을 변경하는 API가 없어, 무효화는 리포지토리 저장·삭제 메서드 기준으로 적용하고 테스트로 확인함. 바깥 트랜잭션 안에서 미션을 바꾸면 커밋 전에 다른 요청이 이전 데이터로 캐시를 채울 수 있고, 그 경우 TTL 뒤에 반영됨
+- 처리 시간은 실행 환경마다 달라 테스트에서 검증(assert)하지 않고 로그로 보고함. 건수·정합성·실패 건수만 검증함
+- 측정 결과 같은 미션 요청은 락으로 직렬 처리되어 서로 다른 미션 대비 약 2.7배 느리지만(병목 존재), 요청 1건의 락 점유가 약 1.5ms라 락 대기 제한(10초) 안에서 200건까지 실패 0건. H2 In-memory·커넥션 풀 10개 기준이라 실제 운영 DB에서는 다시 측정해야 함
+- QA ID는 기존 QA-C(쿠폰 계약)·QA-P(참여 정책)와 겹치지 않도록 캐싱은 QA-H, 락 성능은 QA-S로 정함
+
+#### 5) 본인의 판단 (그대로 반영 / 수정하여 반영 / 반영하지 않음 / 추가 확인 후 결정)
+
+**수정하여 반영**
+
+| No | 수정 내용 | 판단 근거 |
+|:--:|---|---|
+| 1 | 캐시 무효화 로직 제외 | 과제의 미션 데이터는 Seed Data로만 적재되고 미션을 변경하는 기능이 없어, 미션 저장·삭제 시 캐시를 비우는 로직(`MissionRepository`의 `@CacheEvict` 메서드)은 현재 과제 범위를 넘는다고 판단함. 무효화 로직과 관련 테스트(미션 추가·삭제 시 무효화 검증)를 제거하고, 미션 데이터 변경은 캐시 만료 시간(TTL 10분)이 지나면 반영되도록 함 |
+
+그 밖의 결과(일자 키 캐싱, TTL 설정, 동시성 제어 락 성능 측정·정합성 검증 테스트)는 그대로 반영함. 제거 후 전체 테스트 104개(캐싱 3 + 락 성능 3 포함) 통과.
+
+추가 지시 원문
+
+```
+캐시 무효화 로직은 제거
+```
+
+#### 6) 결과 검증
+
+| 완료 조건 | 검증 방법 | 결과 |
+|---|---|---|
+| 같은 일자 반복 조회 시 첫 요청만 DB 조회, 미션 변경 시 캐시 갱신 | `MissionCacheTest` QA-H01~H05 (Hibernate 통계 쿼리 실행 횟수, 캐시 저장 여부 확인) | 같은 일자 3번 조회 시 DB 쿼리 1 → 0 → 0회. 미션 추가·삭제 시 캐시가 비워지고 다음 조회에 반영(참여 가능 미션 조회 결과 포함). TTL 10분 설정 확인 |
+| 동시 요청에서 중복 참여·중복 보상 없음 | `LockPerformanceTest` QA-S01~S03 | 사용자별 참여 1건, 이력당 보상 1건, 발급 쿠폰 수 = 쿠폰 지급 보상 수, 락 대기·기타 실패 0건 |
+| 동시 요청 수별 처리 시간·실패 건수로 락 병목 확인 | `LockPerformanceTest` `[PERF]` 로그 (`TEST_RESULT.md`에 기록) | 10/50/100/200건 모두 락 대기 실패 0건. 같은 미션 집중 시 직렬화로 처리 시간 증가(같은 미션 145ms vs 분산 53ms)는 있으나 실패로 이어지지 않음 |
+| 기존 기능 영향 없음 | 전체 테스트 실행 (`gradlew.bat clean test`) | 106/106 통과 (기존 98 + 캐싱 5 + 락 성능 3) |
+
+#### 7) 최종 반영 위치
+
+| 구분 | 파일 |
+|---|---|
+| 캐시 설정 | `build.gradle`(cache, caffeine 의존성), `source-code/src/main/resources/application.yml`(`spring.cache`), `common/config/CacheConfig.java`(신규) |
+| 캐싱·무효화 | `mission/repository/MissionRepository.java`(`@Cacheable`, `@CacheEvict`), `mission/service/MissionService.java`(주석) |
+| 테스트 | `integration/MissionCacheTest.java`(신규, QA-H), `integration/LockPerformanceTest.java`(신규, QA-S) |
+| 문서 | `README.md`, `DESIGN.md`, `api-spec.md`, `test-or-verification/QA_LIST.md`, `TEST_RESULT.md` |
 
 (소스 경로 기준: `source-code/src/main/java/com/linepay/reward/`, 테스트: `test-or-verification/src/test/java/com/linepay/reward/`)
 

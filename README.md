@@ -12,6 +12,7 @@
 | Database | H2 In-memory |
 | Test | JUnit 5 (spring-boot-starter-test) |
 | 코드 간소화 | Lombok (Spring Boot 관리 버전, 컴파일 시점에만 사용) |
+| 캐시 | Spring Cache + Caffeine (애플리케이션 내 로컬 캐시, 외부 인프라 없음) |
 
 - Lombok: 엔티티 Getter·기본 생성자, `@RequiredArgsConstructor` 생성자 주입, `@Slf4j` 로거 (엔티티에 `@Data`·`@Setter`는 쓰지 않음)
 - Spring Validation: 경로 변수(`userId`, `missionId`, `participationNo`) 필수값 검증
@@ -152,6 +153,7 @@ linepay:
 - 비즈니스 키: 참여 이력은 이력번호(`PT…`), 보상 결과는 리워드번호(`RW…`)로 식별. DB 시퀀스로 중복 없이 채번하고 유니크 제약조건으로 한 번 더 막음
 - 쿠폰 API 호출 실패 처리: `getCouponTemplate`·`issueCoupon`·`getCouponIssue` 호출부에서 IO 오류·타임아웃은 503 `COUPON_COMMUNICATION_FAILED`, 예상하지 못한 응답·그 외 예외는 500 `COUPON_SYSTEM_ERROR`로 응답하고, 두 경우 모두 보상 결과를 `FAILED`로 저장 (같은 이력번호로 재요청 가능). 타임아웃은 실제 연동 시 HTTP 클라이언트에서 설정
 - DB 장애: 데이터 접근 예외를 503 `DATABASE_ERROR`로 응답
+- 조회 캐싱: 참여 가능 미션 조회의 일자별 미션 조회(`findEntryPeriodMissions`)를 조회 일자를 키로 캐싱. 같은 일자의 두 번째 조회부터는 DB를 조회하지 않음. 만료 시간(TTL) 10분 (미션 데이터 변경은 캐시 만료 후 반영)
 - 반복·동시 요청: 미션 단위(완료 처리), 참여 이력 단위(보상 지급)로 DB 비관적 락을 걸어 정책이 깨지지 않도록 처리
 - 외부 쿠폰 시스템: `CouponClient` 계약 + `FakeCouponSystem` 재현체 (멱등 requestId, 한도 소진, 유효하지 않은 템플릿, 404)
 
@@ -172,6 +174,7 @@ API 상세는 [api-spec.md](api-spec.md)를 참고해 주세요.
 
 - prod 프로파일도 과제 실행 조건(외부 인프라 없음)에 맞춰 In-memory H2와 Seed Data를 그대로 씁니다. 실제 운영에서는 DB 연결 정보를 prod 설정에 따로 두어야 합니다.
 - In-memory H2를 쓰므로 애플리케이션을 재시작하면 참여·보상 이력이 초기화됩니다. 쿠폰 재현체도 메모리에 상태를 둡니다.
-- 동시성 제어는 단일 DB의 행 락(`SELECT ... FOR UPDATE`)에 의존합니다. 같은 미션에 대한 완료 요청은 직렬로 처리되므로, 인기 미션에서는 처리량이 제한될 수 있습니다.
+- 동시성 제어는 단일 DB의 행 락(`SELECT ... FOR UPDATE`)에 의존합니다. 같은 미션에 대한 완료 요청은 직렬로 처리되므로, 인기 미션에서는 처리량이 제한될 수 있습니다. (측정: 같은 미션 100건 145ms, 서로 다른 미션 10개로 나누면 53ms. 200건 동시 요청까지 락 대기 실패 0건. `TEST_RESULT.md` 참고)
+- 미션 조회 캐시는 변경 시 무효화하지 않습니다. 미션 데이터를 바꾸면 만료 시간(최대 10분) 뒤에 조회 결과에 반영됩니다. 캐시는 인스턴스별 로컬 캐시(Caffeine)입니다.
 - 외부 쿠폰 발급 호출이 DB 트랜잭션(락) 안에서 이뤄집니다. 실제 외부 연동에서 응답이 느려지면 락을 쥐는 시간도 길어집니다.
 - 기준 시각이 고정(`fixed-at`)된 상태에서는 실행 중 시간이 흐르지 않습니다.

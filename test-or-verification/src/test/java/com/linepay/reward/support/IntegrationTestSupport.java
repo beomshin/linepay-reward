@@ -1,5 +1,6 @@
 package com.linepay.reward.support;
 
+import com.linepay.reward.common.config.CacheConfig;
 import com.linepay.reward.common.number.BusinessNumberGenerator;
 import com.linepay.reward.coupon.FakeCouponSystem;
 import com.linepay.reward.mission.domain.ItemType;
@@ -16,6 +17,7 @@ import com.linepay.reward.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Import;
 
 import java.time.LocalDateTime;
@@ -44,6 +46,7 @@ public abstract class IntegrationTestSupport {
     @Autowired protected MissionParticipationRepository participationRepository;
     @Autowired protected RewardRepository rewardRepository;
     @Autowired protected BusinessNumberGenerator numberGenerator;
+    @Autowired protected CacheManager cacheManager;
 
     @BeforeEach
     void resetState() {
@@ -58,6 +61,8 @@ public abstract class IntegrationTestSupport {
         userRepository.findAll().stream()
                 .filter(user -> user.getUserId().startsWith(TEST_PREFIX))
                 .forEach(userRepository::delete);
+        // 일자별 미션 캐시는 변경 시 무효화하지 않으므로(TTL 만료로만 반영), 테스트 간 영향이 없도록 비운다
+        cacheManager.getCache(CacheConfig.ENTRY_PERIOD_MISSIONS).clear();
         couponSystem.reset();
         clock.reset();
         randomizer.reset();

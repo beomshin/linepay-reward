@@ -49,7 +49,8 @@ public class MissionService {
         log.info("[MISSION] 참여 가능 미션 조회 시작 userId={} 기준시각={}", userId, now);
         userValidator.validateExists(userId);
 
-        // [DB] 오늘 참여 기간에 걸친 미션만 조회(인덱스: idx_mission_entry_period) → 미션별 참여 조건 검사
+        // [캐시 → DB] 오늘 참여 기간에 걸친 미션만 조회 → 미션별 참여 조건 검사
+        //  - 교정 5: 같은 일자의 두 번째 조회부터는 캐시에서 응답 (DB 조회 시에만 인덱스 idx_mission_entry_period 사용)
         List<Mission> periodMissions = missionRepository.findEntryPeriodMissions(KstTime.toDate(now));
         log.info("[MISSION] 참여 기간 미션 조회 완료 기준일자={} 건수={}", KstTime.toDate(now), periodMissions.size());
 
