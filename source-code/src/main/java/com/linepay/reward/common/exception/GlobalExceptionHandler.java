@@ -27,9 +27,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException e) {
         if (e.getErrorCode().getHttpStatus().is5xxServerError()) {
-            log.error("business error: {}", e.getErrorCode(), e);
+            log.error("[EXC] business error: {}", e.getErrorCode(), e);
         } else {
-            log.info("business rejected: {}", e.getErrorCode());
+            log.info("[EXC] business rejected: {}", e.getErrorCode());
         }
         return toResponse(e.getErrorCode());
     }
@@ -83,7 +83,7 @@ public class GlobalExceptionHandler {
     /** 그 외 예상하지 못한 오류 */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnexpected(Exception e) {
-        log.error("unexpected error", e);
+        log.error("[EXC] unexpected error", e);
         return toResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     }
 
@@ -100,7 +100,7 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<ApiResponse<Void>> toValidationResponse(ErrorCode errorCode, String field) {
-        log.info("request validation failed: {} field={}", errorCode, field);
+        log.info("[EXC] request validation failed: {} field={}", errorCode, field);
         return ResponseEntity.status(errorCode.getHttpStatus()).body(ApiResponse.fail(errorCode, field));
     }
 

@@ -12,6 +12,7 @@ import com.linepay.reward.mission.repository.MissionParticipationRepository;
 import com.linepay.reward.mission.repository.MissionRepository;
 import com.linepay.reward.user.UserValidator;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +28,7 @@ import java.util.Optional;
  *     <li>미션 수행 완료 처리 → 미션 참여 이력 생성 (과제 6.1, 6.2)</li>
  * </ul>
  */
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class MissionService {
@@ -49,6 +51,7 @@ public class MissionService {
                 .map(AvailableMissionResponse.MissionSummary::from)
                 .toList();
 
+        log.debug("[MISSION] available missions userId={} count={}", userId, missions.size());
         return new AvailableMissionResponse(userId, missions);
     }
 
@@ -62,17 +65,23 @@ public class MissionService {
     @Transactional
     public ParticipationResponse completeMission(String userId, String missionId) {
         userValidator.validateExists(userId);
+        // 1) 미션 행 락 획득: 같은 미션의 완료 요청은 여기서부터 한 건씩 순서대로 처리된다.
         Mission mission = missionRepository.findByIdForUpdate(missionId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MISSION_NOT_FOUND));
 
+        // 2) 락을 쥔 상태에서 참여 조건 검사 (기간 → 전체 100회 → 일 10회 → 1시간 재참여)
         LocalDateTime now = KstTime.now(clock);
         checkParticipation(mission, userId, now).ifPresent(errorCode -> {
+            log.info("[MISSION] complete rejected userId={} missionId={} reason={}", userId, missionId, errorCode);
             throw new BusinessException(errorCode);
         });
 
         // 완료 요청이 정상적으로 받아들여진 시점(now)을 참여 시각으로 기록 -> 재참여 판단 기준
+        // 3) 참여 이력 생성 (트랜잭션 커밋 시 락 해제)
         MissionParticipation participation =
                 participationRepository.save(new MissionParticipation(missionId, userId, now));
+        log.info("[MISSION] completed userId={} missionId={} participationId={}",
+                userId, missionId, participation.getParticipationId());
         return ParticipationResponse.from(participation);
     }
 

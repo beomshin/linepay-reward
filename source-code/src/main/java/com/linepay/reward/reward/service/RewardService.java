@@ -58,18 +58,25 @@ public class RewardService {
     @Transactional
     public RewardResponse requestReward(String userId, Long participationId) {
         userValidator.validateExists(userId);
+        // 1) 참여 이력 행 락 획득 + 소유자 확인 (다른 사용자의 이력은 존재 여부를 드러내지 않도록 404)
         MissionParticipation participation = participationRepository.findByIdForUpdate(participationId)
                 .filter(p -> p.isOwnedBy(userId))
                 .orElseThrow(() -> new BusinessException(ErrorCode.PARTICIPATION_NOT_FOUND));
 
+        // 2) 참여 이력 1건당 보상 1회: 이미 지급됐으면 거절, NO_REWARD 였으면 같은 행으로 재시도
         Reward reward = rewardRepository.findByParticipationId(participationId)
                 .orElseGet(() -> Reward.of(participation));
         if (reward.isGranted()) {
+            log.info("[REWARD] already granted participationId={}", participationId);
             throw new BusinessException(ErrorCode.REWARD_ALREADY_GRANTED);
         }
 
+        // 3) 보상 선정·지급 후 결과 저장
         grantOrMarkNoReward(participation, reward, KstTime.now(clock));
-        return RewardResponse.from(rewardRepository.save(reward));
+        Reward saved = rewardRepository.save(reward);
+        log.info("[REWARD] processed participationId={} status={} itemType={} point={} couponId={}",
+                participationId, saved.getRewardStatus(), saved.getItemType(), saved.getPointAmount(), saved.getCouponId());
+        return RewardResponse.from(saved);
     }
 
     /**
@@ -99,6 +106,7 @@ public class RewardService {
             if (item.isCoupon()) {
                 Optional<CouponIssueResponse> issued = findIssuedCoupon(couponRequestId(participation, item));
                 if (issued.isPresent()) {
+                    log.info("[REWARD] recovered already issued coupon requestId={}", issued.get().requestId());
                     reward.grantCoupon(item, issued.get().requestId(), issued.get().couponId(), now);
                     return;
                 }
@@ -129,11 +137,12 @@ public class RewardService {
             } catch (CouponApiException e) {
                 if (e.getErrorType() == CouponErrorType.QUANTITY_EXHAUSTED
                         || e.getErrorType() == CouponErrorType.INVALID_TEMPLATE) {
-                    log.info("coupon not issuable, exclude from candidates. template={}, reason={}",
+                    log.info("[REWARD] coupon not issuable, exclude from candidates. template={}, reason={}",
                             picked.getCouponTemplateId(), e.getErrorType());
                     candidates.remove(picked);
                     continue;
                 }
+                log.error("[REWARD] unexpected coupon system result requestId={} type={}", requestId, e.getErrorType());
                 throw new BusinessException(ErrorCode.COUPON_SYSTEM_ERROR, e);
             }
         }

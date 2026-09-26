@@ -1,0 +1,24 @@
+# =====================================================================
+# local : 개발자 PC 실행 / 과제 검증용
+#  - 로그: 콘솔 출력 (logback-spring.xml)
+#  - 테스트용 설정(기준 시각 고정, H2 콘솔)은 이 프로파일에만 둔다.
+# =====================================================================
+spring:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  jpa:
+    properties:
+      hibernate:
+        format_sql: true
+
+linepay:
+  clock:
+    # [테스트용] 서비스 기준 시각(KST)을 과제 9절 "Seed Data 검증 기준 시각"으로 고정한다.
+    # 운영(prod) 프로파일에는 두지 않으며, 값이 없으면 시스템 현재 시각(KST)을 사용한다.
+    fixed-at: 2026-09-01T12:00:00+09:00
+
+logging:
+  level:
+    com.linepay.reward: DEBUG

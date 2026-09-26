@@ -1,0 +1,17 @@
+# =====================================================================
+# prod : 운영
+#  - 로그: 일자별 롤링 파일 출력 (logback-spring.xml, ${logging.file.path})
+#  - 테스트용 설정(기준 시각 고정 linepay.clock.fixed-at, H2 콘솔)은 두지 않는다.
+#    → 시스템 현재 시각(KST)을 사용한다.
+# =====================================================================
+spring:
+  h2:
+    console:
+      enabled: false
+
+logging:
+  file:
+    # 로그 파일 디렉터리 (실행 위치 기준). 기동 옵션 --logging.file.path=... 로 변경 가능
+    path: ./logs
+  level:
+    com.linepay.reward: INFO
