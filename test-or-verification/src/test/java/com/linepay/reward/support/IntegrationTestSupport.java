@@ -1,5 +1,6 @@
 package com.linepay.reward.support;
 
+import com.linepay.reward.common.number.BusinessNumberGenerator;
 import com.linepay.reward.coupon.FakeCouponSystem;
 import com.linepay.reward.mission.domain.ItemType;
 import com.linepay.reward.mission.domain.Mission;
@@ -42,6 +43,7 @@ public abstract class IntegrationTestSupport {
     @Autowired protected MissionItemRepository missionItemRepository;
     @Autowired protected MissionParticipationRepository participationRepository;
     @Autowired protected RewardRepository rewardRepository;
+    @Autowired protected BusinessNumberGenerator numberGenerator;
 
     @BeforeEach
     void resetState() {
@@ -77,6 +79,7 @@ public abstract class IntegrationTestSupport {
 
     /** 정책 검사를 거치지 않고 참여 이력을 직접 적재 (한도 경계 상황 준비용) */
     protected MissionParticipation insertParticipation(String missionId, String userId, LocalDateTime at) {
-        return participationRepository.save(new MissionParticipation(missionId, userId, at));
+        return participationRepository.save(
+                new MissionParticipation(numberGenerator.nextParticipationNo(at), missionId, userId, at));
     }
 }

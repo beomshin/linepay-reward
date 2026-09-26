@@ -38,10 +38,10 @@ class CouponIssueFallbackTest extends IntegrationTestSupport {
     @DisplayName("QA-F01 발급 시점에 한도 소진되면 쿠폰을 후보에서 제외하고 포인트로 다시 선정한다")
     void fallbackToPointWhenExhaustedAtIssue() {
         doThrow(new CouponApiException(CouponErrorType.QUANTITY_EXHAUSTED)).when(couponSpy).issueCoupon(any());
-        Long participationId = missionService.completeMission("USER_0001", "MISSION_0002").participationId();
-        randomizer.forceIndexes(1); // 먼저 쿠폰 선택
+        String participationNo = missionService.completeMission("USER_0001", "MISSION_0002").participationNo();
+        randomizer.forcePicks("ITEM_0003"); // 먼저 쿠폰 선택
 
-        RewardResponse reward = rewardService.requestReward("USER_0001", participationId);
+        RewardResponse reward = rewardService.requestReward("USER_0001", participationNo);
 
         assertThat(reward.rewardStatus()).isEqualTo(RewardStatus.GRANTED);
         assertThat(reward.itemType()).isEqualTo(ItemType.REWARD_POINT);
@@ -51,12 +51,12 @@ class CouponIssueFallbackTest extends IntegrationTestSupport {
     @DisplayName("QA-F02 예상하지 못한 외부 오류(REQUEST_ID_CONFLICT)는 COUPON_SYSTEM_ERROR, 보상 결과는 저장되지 않는다")
     void unexpectedCouponError() {
         doThrow(new CouponApiException(CouponErrorType.REQUEST_ID_CONFLICT)).when(couponSpy).issueCoupon(any());
-        Long participationId = missionService.completeMission("USER_0001", "MISSION_0002").participationId();
-        randomizer.forceIndexes(1);
+        String participationNo = missionService.completeMission("USER_0001", "MISSION_0002").participationNo();
+        randomizer.forcePicks("ITEM_0003");
 
-        assertThatThrownBy(() -> rewardService.requestReward("USER_0001", participationId))
+        assertThatThrownBy(() -> rewardService.requestReward("USER_0001", participationNo))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.COUPON_SYSTEM_ERROR);
-        assertThat(rewardRepository.findByParticipationId(participationId)).isEmpty();
+        assertThat(rewardRepository.findByParticipationNo(participationNo)).isEmpty();
     }
 }

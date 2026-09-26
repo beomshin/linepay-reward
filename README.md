@@ -14,7 +14,7 @@
 | 코드 간소화 | Lombok (Spring Boot 관리 버전, 컴파일 시점에만 사용) |
 
 - Lombok: 엔티티 Getter·기본 생성자, `@RequiredArgsConstructor` 생성자 주입, `@Slf4j` 로거 (엔티티에 `@Data`·`@Setter`는 쓰지 않음)
-- Spring Validation: 경로 변수(`userId`, `missionId`, `participationId`) 검증
+- Spring Validation: 경로 변수(`userId`, `missionId`, `participationNo`) 필수값 검증
 - IntelliJ에서 열 때는 Lombok 플러그인과 Annotation Processing이 켜져 있어야 합니다. (Gradle 빌드/테스트는 설정 없이 동작)
 
 ## 2. 프로젝트 구조
@@ -94,22 +94,22 @@ INFO  [d6b6...] [MISSION] 미션 완료 처리 시작 userId=USER_0002 missionId
 INFO  [d6b6...] [USER] 사용자 조회 userId=USER_0002 존재여부=true
 INFO  [d6b6...] [MISSION] 미션 락 획득 missionId=MISSION_0002 참여기간=2026-05-01T00:00~2027-01-01T00:00
 INFO  [d6b6...] [MISSION] 참여 조건 검사 missionId=MISSION_0002 userId=USER_0002 전체참여=0 당일참여=0 직전참여=null 결과=참여가능
-INFO  [d6b6...] [MISSION] 참여 이력 저장 완료 userId=USER_0002 missionId=MISSION_0002 participationId=1 참여일시=2026-09-01T12:00
+INFO  [d6b6...] [MISSION] 참여 이력 저장 완료 userId=USER_0002 missionId=MISSION_0002 participationNo=PT202609010000000001 참여일시=2026-09-01T12:00
 INFO  [d6b6...] [RES] 요청 종료 - POST /linepay/v1/mission/USER_0002/MISSION_0002/complete 상태=200 처리시간=64ms
 
-INFO  [99a1...] [REQ] 요청 시작 - POST /linepay/v1/reward/USER_0002/1
-INFO  [99a1...] [REWARD] 보상 지급 요청 시작 userId=USER_0002 participationId=1
+INFO  [99a1...] [REQ] 요청 시작 - POST /linepay/v1/reward/USER_0002/PT202609010000000001
+INFO  [99a1...] [REWARD] 보상 지급 요청 시작 userId=USER_0002 participationNo=PT202609010000000001
 INFO  [99a1...] [USER] 사용자 조회 userId=USER_0002 존재여부=true
-INFO  [99a1...] [REWARD] 참여 이력 락 획득 participationId=1 missionId=MISSION_0002
-INFO  [99a1...] [REWARD] 기존 보상 결과 조회 participationId=1 상태=없음
+INFO  [99a1...] [REWARD] 참여 이력 락 획득 participationNo=PT202609010000000001 missionId=MISSION_0002
+INFO  [99a1...] [REWARD] 기존 보상 결과 조회 participationNo=PT202609010000000001 상태=없음
 INFO  [99a1...] [REWARD] 보상 아이템 조회 missionId=MISSION_0002 건수=2 아이템=[ITEM_0002(REWARD_POINT), ITEM_0003(COUPON)]
 INFO  [99a1...] [COUPON] 기존 발급 결과 조회 requestId=REWARD_1_COUPON_TEMPLATE_0001 결과=없음
 INFO  [99a1...] [COUPON] 쿠폰 템플릿 조회 couponTemplateId=COUPON_TEMPLATE_0001 상태=AVAILABLE 발급수량=0/100 발급가능=true
 INFO  [99a1...] [REWARD] 지급 후보 확정 건수=2 후보=[ITEM_0002, ITEM_0003]
 INFO  [99a1...] [REWARD] 보상 아이템 무작위 선택 아이템=ITEM_0002 유형=REWARD_POINT (후보 2건 중)
 INFO  [99a1...] [REWARD] 포인트 지급 결정 포인트=5
-INFO  [99a1...] [REWARD] 보상 결과 저장 완료 participationId=1 상태=GRANTED 아이템=ITEM_0002 유형=REWARD_POINT 포인트=5 couponId=null
-INFO  [99a1...] [RES] 요청 종료 - POST /linepay/v1/reward/USER_0002/1 상태=200 처리시간=33ms
+INFO  [99a1...] [REWARD] 보상 결과 저장 완료 rewardNo=RW202609010000000001 participationNo=PT202609010000000001 상태=GRANTED 아이템=ITEM_0002 유형=REWARD_POINT 포인트=5 couponId=null
+INFO  [99a1...] [RES] 요청 종료 - POST /linepay/v1/reward/USER_0002/PT202609010000000001 상태=200 처리시간=33ms
 ```
 
 ### 기준 시각 (local)
@@ -141,14 +141,15 @@ linepay:
 |---|---|
 | 특정 사용자 기준 참여 가능한 미션 목록 조회 | `GET /linepay/v1/mission/{userId}` |
 | 미션 수행 완료 처리 | `POST /linepay/v1/mission/{userId}/{missionId}/complete` |
-| 완료된 미션 참여에 대한 보상 지급 요청 | `POST /linepay/v1/reward/{userId}/{participationId}` |
-| 보상 지급 결과 조회 | `GET /linepay/v1/reward/{userId}/{participationId}` |
+| 완료된 미션 참여에 대한 보상 지급 요청 | `POST /linepay/v1/reward/{userId}/{participationNo}` |
+| 보상 지급 결과 조회 | `GET /linepay/v1/reward/{userId}/{participationNo}` |
 
 비즈니스 정책
 
 - 미션 참여: 참여 기간(`start <= now < end`), 미션 전체 최대 100회, 사용자별 하루(KST) 최대 10회, 직전 참여 후 1시간 경과
 - 보상: 참여 이력 1건당 보상 1회, 보상 아이템 중 무작위 선택, 포인트 5~10 무작위, 쿠폰은 한도 소진·발급 중지 시 제외, 지급 가능한 보상이 없으면 `NO_REWARD` 반환 후 재요청 허용
-- 요청값 검증: 필수값 누락·형식 오류·범위 오류를 400과 영문 코드(`MISSING_REQUIRED_VALUE`/`INVALID_FORMAT`/`OUT_OF_RANGE`) + 한글 메시지로 응답
+- 요청값 검증: 필수값 누락을 400과 영문 코드(`MISSING_REQUIRED_VALUE`) + 한글 메시지로 응답
+- 비즈니스 키: 참여 이력은 이력번호(`PT…`), 보상 결과는 리워드번호(`RW…`)로 식별. DB 시퀀스로 중복 없이 채번하고 유니크 제약조건으로 한 번 더 막음
 - 반복·동시 요청: 미션 단위(완료 처리), 참여 이력 단위(보상 지급)로 DB 비관적 락을 걸어 정책이 깨지지 않도록 처리
 - 외부 쿠폰 시스템: `CouponClient` 계약 + `FakeCouponSystem` 재현체 (멱등 requestId, 한도 소진, 유효하지 않은 템플릿, 404)
 

@@ -19,8 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * 요청값 검증 (교정 1: Spring Validation)
  * - 필수값 누락 → 400 MISSING_REQUIRED_VALUE
- * - 형식 오류   → 400 INVALID_FORMAT (participationId 가 정수가 아닌 경우)
- * - 범위 오류   → 400 OUT_OF_RANGE
+ * - 교정 3 이후 경로 변수는 모두 문자열 식별자(userId, missionId, participationNo)이며 필수값만 검증한다.
  * 모든 응답은 영문 코드 + 한글 메시지 + data=null 이며, 검증 실패 시 서비스 로직까지 전달되지 않는다.
  */
 @AutoConfigureMockMvc
@@ -87,38 +86,42 @@ class RequestValidationApiTest extends IntegrationTestSupport {
         assertThat(participationRepository.count()).isZero();
     }
 
+    /*
+     * 교정 3: 보상 API 는 DB PK(participationId, 숫자) 대신 이력번호(participationNo, 문자열)를 받는다.
+     * 이력번호는 필수값(@NotBlank)만 검증하고, 없는 번호는 서비스에서 404 로 거절한다.
+     */
     @Test
-    @DisplayName("QA-V06 형식 오류: 숫자가 아닌 participationId → 400 INVALID_FORMAT (보상 요청·조회)")
-    void participationIdNotNumber() throws Exception {
-        mockMvc.perform(post("/linepay/v1/reward/USER_0001/abc"))
+    @DisplayName("QA-V06 필수값 누락: 공백 participationNo → 400 MISSING_REQUIRED_VALUE (보상 요청·조회)")
+    void blankParticipationNo() throws Exception {
+        mockMvc.perform(post("/linepay/v1/reward/USER_0001/{participationNo}", " "))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_FORMAT"))
-                .andExpect(jsonPath("$.msg").value("요청값 형식이 올바르지 않습니다. (participationId)"));
-        mockMvc.perform(get("/linepay/v1/reward/USER_0001/1.5"))
+                .andExpect(jsonPath("$.code").value("MISSING_REQUIRED_VALUE"))
+                .andExpect(jsonPath("$.msg").value("필수 요청값이 누락되었습니다. (participationNo)"))
+                .andExpect(jsonPath("$.data").value(nullValue()));
+        mockMvc.perform(get("/linepay/v1/reward/USER_0001/{participationNo}", " "))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_FORMAT"));
+                .andExpect(jsonPath("$.code").value("MISSING_REQUIRED_VALUE"));
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"0", "-1", "-9999"})
-    @DisplayName("QA-V07 범위 오류: 0 이하 participationId → 400 OUT_OF_RANGE")
-    void participationIdOutOfRange(String participationId) throws Exception {
-        mockMvc.perform(post("/linepay/v1/reward/USER_0001/{participationId}", participationId))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("OUT_OF_RANGE"))
-                .andExpect(jsonPath("$.msg").value("요청값이 허용 범위를 벗어났습니다. (participationId)"))
-                .andExpect(jsonPath("$.data").value(nullValue()));
-        mockMvc.perform(get("/linepay/v1/reward/USER_0001/{participationId}", participationId))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("OUT_OF_RANGE"));
+    @ValueSource(strings = {"abc", "0", "-1", "PT209901010000000001"})
+    @DisplayName("QA-V07 존재하지 않는 이력번호 → 검증 통과 후 404 PARTICIPATION_NOT_FOUND")
+    void unknownParticipationNo(String participationNo) throws Exception {
+        mockMvc.perform(post("/linepay/v1/reward/USER_0001/{participationNo}", participationNo))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PARTICIPATION_NOT_FOUND"));
     }
 
     @Test
-    @DisplayName("QA-V08 형식 오류: Long 범위를 넘는 숫자 participationId → 400 INVALID_FORMAT")
-    void participationIdOverflow() throws Exception {
-        mockMvc.perform(get("/linepay/v1/reward/USER_0001/99999999999999999999"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_FORMAT"));
+    @DisplayName("QA-V08 정상 발급된 이력번호로 보상 결과 조회 → 요청 전이면 404 REWARD_NOT_FOUND")
+    void issuedParticipationNo() throws Exception {
+        String body = mockMvc.perform(post("/linepay/v1/mission/USER_0001/MISSION_0003/complete"))
+                .andReturn().getResponse().getContentAsString();
+        String participationNo = body.replaceAll(".*\"participationNo\":\"(\\w+)\".*", "$1");
+
+        mockMvc.perform(get("/linepay/v1/reward/USER_0001/{participationNo}", participationNo))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("REWARD_NOT_FOUND"));
     }
 
     @Test

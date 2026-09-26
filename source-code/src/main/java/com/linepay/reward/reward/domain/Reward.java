@@ -22,7 +22,8 @@ import java.time.LocalDateTime;
 /**
  * 미션 참여 이력에 대한 보상 지급 결과 (과제 7절).
  * <p>
- * 참여 이력 하나당 최대 한 행만 존재한다({@code participation_id} UNIQUE).
+  * 참여 이력 하나당 최대 한 행만 존재한다({@code participation_no} UNIQUE).
+ * 리워드번호({@code rewardNo})로 보상 결과를 식별하며, PK({@code rewardId})는 DB 내부 식별용이다.
  * <ul>
  *     <li>{@link RewardStatus#GRANTED}   : 포인트 또는 쿠폰 지급 완료. 추가 지급 불가</li>
  *     <li>{@link RewardStatus#NO_REWARD} : 지급 가능한 보상이 없었음. 재요청 시 같은 행을 갱신</li>
@@ -32,7 +33,10 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
-@Table(name = "reward", uniqueConstraints = @UniqueConstraint(name = "uk_reward_participation", columnNames = "participation_id"))
+@Table(name = "reward", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_reward_no", columnNames = "reward_no"),
+        @UniqueConstraint(name = "uk_reward_participation_no", columnNames = "participation_no")
+})
 public class Reward {
 
     @Id
@@ -40,8 +44,13 @@ public class Reward {
     @Column(name = "reward_id")
     private Long rewardId;
 
-    @Column(name = "participation_id", nullable = false)
-    private Long participationId;
+    /** 리워드번호 (비즈니스 키, 예: RW202609010000000001) */
+    @Column(name = "reward_no", nullable = false, length = 20)
+    private String rewardNo;
+
+    /** 대상 미션 참여 이력번호 */
+    @Column(name = "participation_no", nullable = false, length = 20)
+    private String participationNo;
 
     @Column(name = "mission_id", nullable = false, length = 50)
     private String missionId;
@@ -84,15 +93,16 @@ public class Reward {
     @Column(name = "processed_time", nullable = false, length = 6)
     private String processedTime;
 
-    private Reward(MissionParticipation participation) {
-        this.participationId = participation.getParticipationId();
+    private Reward(String rewardNo, MissionParticipation participation) {
+        this.rewardNo = rewardNo;
+        this.participationNo = participation.getParticipationNo();
         this.missionId = participation.getMissionId();
         this.userId = participation.getUserId();
     }
 
     /** 참여 이력에 대한 보상 결과 행 생성 (상태는 grant/markNoReward 로 확정) */
-    public static Reward of(MissionParticipation participation) {
-        return new Reward(participation);
+    public static Reward of(String rewardNo, MissionParticipation participation) {
+        return new Reward(rewardNo, participation);
     }
 
     public boolean isGranted() {
@@ -128,7 +138,7 @@ public class Reward {
     private void grant(MissionItem item, LocalDateTime now) {
         if (isGranted()) {
             // 서비스 계층에서 먼저 막지만, 도메인에서도 한 번 더 방어한다.
-            throw new IllegalStateException("이미 보상이 지급된 참여 이력입니다. participationId=" + participationId);
+            throw new IllegalStateException("이미 보상이 지급된 참여 이력입니다. participationNo=" + participationNo);
         }
         this.rewardStatus = RewardStatus.GRANTED;
         this.missionItemId = item.getMissionItemId();

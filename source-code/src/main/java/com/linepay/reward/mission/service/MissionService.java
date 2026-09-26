@@ -2,6 +2,7 @@ package com.linepay.reward.mission.service;
 
 import com.linepay.reward.common.exception.BusinessException;
 import com.linepay.reward.common.exception.ErrorCode;
+import com.linepay.reward.common.number.BusinessNumberGenerator;
 import com.linepay.reward.common.time.KstTime;
 import com.linepay.reward.mission.domain.Mission;
 import com.linepay.reward.mission.domain.MissionParticipation;
@@ -36,6 +37,7 @@ public class MissionService {
     private final MissionRepository missionRepository;
     private final MissionParticipationRepository participationRepository;
     private final UserValidator userValidator;
+    private final BusinessNumberGenerator numberGenerator;
     private final Clock clock;
 
     /**
@@ -47,11 +49,11 @@ public class MissionService {
         log.info("[MISSION] 참여 가능 미션 조회 시작 userId={} 기준시각={}", userId, now);
         userValidator.validateExists(userId);
 
-        // [DB] 전체 미션 조회 → 미션별 참여 조건 검사
-        List<Mission> allMissions = missionRepository.findAllByOrderByMissionIdAsc();
-        log.info("[MISSION] 전체 미션 조회 완료 건수={}", allMissions.size());
+        // [DB] 오늘 참여 기간에 걸친 미션만 조회(인덱스: idx_mission_entry_period) → 미션별 참여 조건 검사
+        List<Mission> periodMissions = missionRepository.findEntryPeriodMissions(KstTime.toDate(now));
+        log.info("[MISSION] 참여 기간 미션 조회 완료 기준일자={} 건수={}", KstTime.toDate(now), periodMissions.size());
 
-        List<AvailableMissionResponse.MissionSummary> missions = allMissions.stream()
+        List<AvailableMissionResponse.MissionSummary> missions = periodMissions.stream()
                 .filter(mission -> checkParticipation(mission, userId, now).isEmpty())
                 .map(AvailableMissionResponse.MissionSummary::from)
                 .toList();
@@ -88,11 +90,13 @@ public class MissionService {
             throw new BusinessException(errorCode);
         });
 
-        // 3) [DB] 참여 이력 저장 (완료 요청이 받아들여진 시각 = 재참여 판단 기준, 트랜잭션 커밋 시 락 해제)
+        // 3) 이력번호 채번(DB 시퀀스) → [DB] 참여 이력 저장
+        //    완료 요청이 받아들여진 시각 = 재참여 판단 기준, 트랜잭션 커밋 시 락 해제
+        String participationNo = numberGenerator.nextParticipationNo(now);
         MissionParticipation participation =
-                participationRepository.save(new MissionParticipation(missionId, userId, now));
-        log.info("[MISSION] 참여 이력 저장 완료 userId={} missionId={} participationId={} 참여일시={}",
-                userId, missionId, participation.getParticipationId(), now);
+                participationRepository.save(new MissionParticipation(participationNo, missionId, userId, now));
+        log.info("[MISSION] 참여 이력 저장 완료 userId={} missionId={} participationNo={} 참여일시={}",
+                userId, missionId, participation.getParticipationNo(), now);
         return ParticipationResponse.from(participation);
     }
 
@@ -106,11 +110,9 @@ public class MissionService {
             return Optional.of(ErrorCode.MISSION_NOT_IN_PERIOD);
         }
         // [DB] 미션 전체 참여 수 / 사용자 당일 참여 수 / 사용자 직전 참여 이력 조회
-        long totalCount = participationRepository.countByMissionId(missionId);
-        long userDailyCount = participationRepository
-                .countByMissionIdAndUserIdAndParticipatedDate(missionId, userId, KstTime.toDate(now));
-        LocalDateTime lastParticipatedAt = participationRepository
-                .findFirstByMissionIdAndUserIdOrderByParticipatedDateDescParticipatedTimeDescParticipationIdDesc(missionId, userId)
+        long totalCount = participationRepository.countByMission(missionId);
+        long userDailyCount = participationRepository.countDailyByUser(missionId, userId, KstTime.toDate(now));
+        LocalDateTime lastParticipatedAt = participationRepository.findLatestByUser(missionId, userId)
                 .map(MissionParticipation::getParticipatedAt)
                 .orElse(null);
 

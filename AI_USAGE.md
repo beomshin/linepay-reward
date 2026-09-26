@@ -473,6 +473,101 @@ API 요청이 들어오고 일반적으로 DB조회 혹은 중요 서비스 로�
 
 (소스 경로 기준: `source-code/src/main/java/com/linepay/reward/`, 테스트: `test-or-verification/src/test/java/com/linepay/reward/`)
 
+### 교정 기록 3. 데이터 모델링 및 조회 최적화 (비즈니스 키 · JPQL 전환 · 인덱스 설계)
+
+#### 1) 교정 기록 제목
+
+데이터 모델링 및 조회 최적화: 이력번호·리워드번호 비즈니스 키 도입, 과도한 JPA 메소드명의 JPQL 전환, 조회 쿼리별 인덱스 설계와 불필요한 전체 조회·정렬 제거
+
+#### 2) 교정이 필요하다고 판단한 이유
+
+- 로직과 API가 DB PK(`participationId`)에 의존하고 있어, 운영에 필요한 리워드번호·이력번호 같은 유니크 식별값이 없음
+- `findFirstByMissionIdAndUserIdOrderByParticipatedDateDescParticipatedTimeDescParticipationIdDesc`처럼 긴 JPA 메소드명은 읽기 어렵고, 테이블·컬럼 이름이 바뀌면 대응하기 어려움
+- 미션 전체 조회, 인덱스가 맞지 않는 카운트 조회, 보상 아이템의 불필요한 정렬 때문에 데이터가 늘면 성능 문제가 생길 수 있음
+- 13.3 초기 결과 검토의 "부족한 부분 3번(데이터 모델링 보완), 5번(데이터 증가에 따른 처리)", "불필요하거나 과도한 부분 1번(과도한 JPA 문법)", "가장 중요하게 선택한 문제 3·4순위"에 대한 후속 조치
+
+#### 3) AI에 전달한 후속 지시 원문
+
+세션 지시: `교정 기록 3번째 사항 적용 및 기록 처리`
+
+첨부한 교정 프롬프트(`교정_3_데이터모델링_조회최적화_프롬프트.md`) 원문:
+
+````markdown
+# 데이터 모델링 및 조회 최적화 (비즈니스 키 · JPQL 전환 · 인덱스 설계)
+
+PK에 의존하는 로직을 유니크한 비즈니스 키 기반으로 전환하고, 과도한 JPA 메소드명과 비효율적인 조회를 개선하여 데이터 증가에 대비해 주세요.
+
+## 교정 사유
+1. 로직이 PK 기준으로 구성되어 있어, 운영에 필요한 리워드번호·이력번호 같은 유니크 식별값이 없음
+2. 과도하게 긴 JPA 메소드명은 가독성이 떨어지고, 테이블·컬럼 네이밍이 바뀌면 대응하기 어려움
+3. 전체 조회, 인덱스 없는 카운트 조회, 불필요한 정렬 때문에 데이터가 늘어나면 성능 이슈가 생길 수 있음
+
+## 지시 사항
+1. 리워드번호·이력번호 등 유니크한 비즈니스 키를 추가하고 유니크 제약조건을 설정하며, 동시 요청에도 중복되지 않는 채번 로직을 구현하고 PK 의존 로직을 비즈니스 키 기준으로 수정
+2. `findFirstByMissionIdAndUserIdOrderByParticipatedDateDescParticipatedTimeDescParticipationIdDesc` 등 과도한 JPA 메소드명을 JPQL(`@Query`)로 전환
+3. 조회 쿼리별 인덱스를 설계·적용하고, `findAllByOrderByMissionIdAsc`는 조회 조건을 추가해 전체 조회를 개선하며, `findByMissionIdOrderByMissionItemIdAsc`의 불필요한 정렬은 제거
+
+## 완료 조건
+1. 동시 요청 테스트로 이력번호·리워드번호가 중복 없이 채번되는지, 유니크 제약조건이 동작하는지 확인
+2. JPQL 전환 후 기존 테스트가 모두 통과하여 조회 결과가 변경 전과 같은지 확인
+3. 실행 계획(EXPLAIN)으로 주요 조회 쿼리가 설계한 인덱스를 사용하는지, 불필요한 정렬이 제거되었는지 확인
+````
+
+#### 4) AI의 결과
+
+| 지시 사항 | AI 결과 |
+|---|---|
+| 비즈니스 키 추가·유니크 제약 | `mission_participation.participation_no`(이력번호), `reward.reward_no`(리워드번호) 추가. 유니크 제약 `uk_participation_no`, `uk_reward_no`, `uk_reward_participation_no` 설정. 형식은 접두어(`PT`/`RW`) + 일자(yyyyMMdd) + 일련번호 10자리 |
+| 동시 요청에도 중복 없는 채번 | `schema.sql`에 DB 시퀀스(`participation_no_seq`, `reward_no_seq`)를 만들고 `common/number/BusinessNumberGenerator`가 `NEXT VALUE FOR`로 일련번호를 받음. 애플리케이션 락 없이 DB가 중복을 막고, 유니크 제약으로 한 번 더 막음 |
+| PK 의존 로직 → 비즈니스 키 | 보상 API 경로 변수 `participationId`(숫자) → `participationNo`(문자열). 응답에서 PK를 빼고 `participationNo`·`rewardNo` 반환. `reward`→참여 이력 연결을 `participation_no`로 변경. 참여 이력 락·조회, 쿠폰 발급 requestId(`REWARD_{participationNo}_{템플릿}`)도 이력번호 기준으로 변경. NO_REWARD 재요청 시 기존 리워드번호 유지 |
+| JPQL 전환 | 모든 조회 메서드를 `@Query`로 전환: `countByMission`, `countDailyByUser`, `findRecentByUser`(+`findLatestByUser` 1건), `findByParticipationNo(ForUpdate)`, `RewardRepository.findByParticipationNo`, `MissionItemRepository.findByMission`, `MissionRepository.findEntryPeriodMissions` |
+| 인덱스 설계·적용 | 참여 이력 `idx_participation_mission_user_datetime`(mission_id, user_id, participated_date, participated_time) 하나로 전체 참여 수·당일 참여 수·직전 참여 조회를 처리. 미션 `idx_mission_entry_period`(entry_start_date, entry_end_date) 추가. 기존 보상 아이템 `idx_mission_item_mission` 유지 |
+| 전체 조회 개선 | `findAllByOrderByMissionIdAsc` → 오늘 참여 기간에 걸친 미션만 일자 조건으로 조회(`findEntryPeriodMissions`). 시·분·초 단위 기간 판단은 기존 참여 정책에서 수행 |
+| 불필요한 정렬 제거 | 보상 아이템 조회의 `ORDER BY` 제거. 목록 순서가 보장되지 않으므로 `RewardRandomizer`를 인덱스 대신 아이템을 고르는 `pick(List<MissionItem>)`으로 변경하고, 테스트용 무작위 생성기는 아이템 ID로 선택을 지정하도록 변경. 직전 참여 조회의 PK 역순 조건도 제거 |
+| 테스트 추가·수정 | `BusinessKeyTest`(QA-K01~K06), `ExplainPlanTest`(QA-I01~I07) 추가. 기존 테스트는 `participationId` → `participationNo`로 입력값 변경. `RequestValidationApiTest` V06~V08, `RewardApiTest` A06을 이력번호 기준으로 변경 |
+| 문서 반영 | `api-spec.md`(경로 변수·응답·식별 번호), `README.md`, `DESIGN.md`(5. 데이터 모델링 및 조회 최적화), `QA_LIST.md`(QA-K, QA-I), `TEST_RESULT.md`(실행 계획), `api-verification.http` |
+
+AI가 진행 중 판단하거나 보고한 사항
+
+- 보상 API의 경로 변수가 숫자 PK에서 문자열 이력번호로 바뀌면서, 교정 1에서 넣었던 `participationId`의 형식 오류(`INVALID_FORMAT`)·범위 오류(`OUT_OF_RANGE`) 검증은 적용 대상이 없어짐. 이력번호는 필수값(`@NotBlank`)만 검증하고 없는 번호는 404로 거절(교정 1에서 식별자 형식 제한을 두지 않기로 한 판단과 같은 방식). 두 에러 코드는 정의만 남아 있음
+- DB 시퀀스는 트랜잭션이 롤백돼도 값이 되돌아가지 않아 번호 중간에 빈 값이 생길 수 있음
+- H2 실행 계획에서 직전 참여 조회는 인덱스로 범위를 찾지만 역순 정렬은 H2가 따로 수행함(정렬 대상은 같은 사용자·미션의 이력뿐). 참여 기간 미션 조회의 `ORDER BY mission_id`는 응답 순서를 고정하기 위해 남김
+- EXPLAIN 검증은 Repository JPQL과 같은 조건의 SQL을 직접 작성해 실행한 것으로, Hibernate가 생성한 SQL 자체를 EXPLAIN한 것은 아님
+
+#### 5) 본인의 판단 (그대로 반영 / 수정하여 반영 / 반영하지 않음 / 추가 확인 후 결정)
+
+
+
+#### 6) 결과 검증
+
+| 완료 조건 | 검증 방법 | 결과 |
+|---|---|---|
+| 동시 요청에서 이력번호·리워드번호 중복 없음, 유니크 제약 동작 | `BusinessKeyTest`: 채번기 동시 300건, 사용자 100명 동시 미션 완료, 참여 이력 50건 동시 보상, 같은 번호 중복 저장 | 중복 0건. 같은 이력번호·리워드번호·참여 이력으로 저장하면 `DataIntegrityViolationException` |
+| JPQL 전환 후 기존 테스트 통과 (조회 결과 동일) | 전체 테스트 실행 (`gradlew.bat clean test`) | 기존 미션·보상·동시성·로그 테스트 모두 통과. 테스트 입력값만 `participationNo`로 변경 |
+| EXPLAIN으로 설계 인덱스 사용, 불필요한 정렬 제거 | `ExplainPlanTest`: 주요 조회 7개를 H2 `EXPLAIN`으로 실행 | 7개 모두 설계한 인덱스 사용. 보상 아이템 조회 실행 계획에 `ORDER BY` 없음 |
+| (추가) 실제 서버 동작 | `java -jar`(local) 기동 후 API 호출 | 미션 완료 `PT202609010000000001`, 보상 `RW202609010000000001` 발급. DB PK(`/reward/USER_0001/1`)로 요청하면 404 |
+
+테스트 실행 이력
+
+| 회차 | 결과 | 비고 |
+|:--:|---|---|
+| 1 | 컴파일 실패 | `RewardService.getReward`의 `findByParticipationId` 호출 1곳 미변경 → 수정 |
+| 2 | 102/102 통과 | 실행 계획 확인 결과 참여 기간 미션 조회도 `idx_mission_entry_period` 사용 → QA-I07에 인덱스 확인 추가 |
+| 3 | 102/102 통과 | 최종 확인 (+ 실제 서버 기동 확인) |
+
+#### 7) 최종 반영 위치
+
+| 구분 | 파일 |
+|---|---|
+| 채번 | `source-code/src/main/resources/schema.sql`(신규), `common/number/BusinessNumberGenerator.java`(신규) |
+| 엔티티·인덱스 | `mission/domain/MissionParticipation.java`, `reward/domain/Reward.java`, `mission/domain/Mission.java` |
+| JPQL | `mission/repository/MissionRepository.java`, `MissionItemRepository.java`, `MissionParticipationRepository.java`, `reward/repository/RewardRepository.java` |
+| 서비스·API | `mission/service/MissionService.java`, `reward/service/RewardService.java`, `reward/service/RewardRandomizer.java`, `reward/controller/RewardController.java`, `mission/dto/ParticipationResponse.java`, `reward/dto/RewardResponse.java` |
+| 테스트 | `integration/BusinessKeyTest.java`(신규), `integration/ExplainPlanTest.java`(신규), `support/ControllableRewardRandomizer.java`, `support/IntegrationTestSupport.java`, 기존 테스트 7개(식별자 변경) |
+| 문서 | `api-spec.md`, `README.md`, `DESIGN.md`, `test-or-verification/QA_LIST.md`, `TEST_RESULT.md`, `api-verification.http` |
+
+(소스 경로 기준: `source-code/src/main/java/com/linepay/reward/`, 테스트: `test-or-verification/src/test/java/com/linepay/reward/`)
+
 ## 13.5 최종 회고
 
 > 이번 요청에서는 제외 (후속 작성 예정)

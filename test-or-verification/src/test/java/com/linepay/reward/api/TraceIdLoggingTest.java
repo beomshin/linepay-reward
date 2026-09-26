@@ -84,14 +84,14 @@ class TraceIdLoggingTest extends IntegrationTestSupport {
     void rewardFlowLogs(CapturedOutput output) throws Exception {
         String body = mockMvc.perform(post("/linepay/v1/mission/USER_0001/MISSION_0003/complete"))
                 .andReturn().getResponse().getContentAsString();
-        String participationId = body.replaceAll(".*\"participationId\":(\\d+).*", "$1");
+        String participationNo = body.replaceAll(".*\"participationNo\":\"(\\w+)\".*", "$1");
 
-        String traceId = mockMvc.perform(post("/linepay/v1/reward/USER_0001/" + participationId))
+        String traceId = mockMvc.perform(post("/linepay/v1/reward/USER_0001/" + participationNo))
                 .andReturn().getResponse().getHeader(TraceIdFilter.TRACE_ID_HEADER);
 
         List<String> lines = linesOf(output, traceId);
         assertThat(lines).anyMatch(l -> l.contains("[REWARD] 보상 지급 요청 시작"));
-        assertThat(lines).anyMatch(l -> l.contains("[REWARD] 참여 이력 락 획득 participationId=" + participationId));
+        assertThat(lines).anyMatch(l -> l.contains("[REWARD] 참여 이력 락 획득 participationNo=" + participationNo));
         assertThat(lines).anyMatch(l -> l.contains("[REWARD] 기존 보상 결과 조회") && l.contains("상태=없음"));
         assertThat(lines).anyMatch(l -> l.contains("[REWARD] 보상 아이템 조회 missionId=MISSION_0003"));
         assertThat(lines).anyMatch(l -> l.contains("[REWARD] 포인트 지급 결정"));

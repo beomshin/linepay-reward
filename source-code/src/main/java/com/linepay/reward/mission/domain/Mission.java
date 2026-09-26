@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -17,11 +18,14 @@ import java.time.LocalDateTime;
  * 미션 (Seed Data 10.2).
  * <p>
  * 참여 가능 기간(entry_start_at, entry_end_at)은 일자(yyyyMMdd)/시간(HHmmss) 컬럼으로 나눠 저장한다. (KST)
+ * <p>
+ * {@code idx_mission_entry_period} (entry_start_date, entry_end_date): 오늘 참여 기간에 걸친 미션만 조회할 때 사용 (교정 3)
  */
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
-@Table(name = "mission")
+@Table(name = "mission",
+        indexes = @Index(name = "idx_mission_entry_period", columnList = "entry_start_date, entry_end_date"))
 public class Mission {
 
     @Id

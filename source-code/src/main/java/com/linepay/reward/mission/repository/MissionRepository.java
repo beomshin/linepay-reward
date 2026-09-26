@@ -12,7 +12,19 @@ import java.util.Optional;
 
 public interface MissionRepository extends JpaRepository<Mission, String> {
 
-    List<Mission> findAllByOrderByMissionIdAsc();
+    /**
+     * 오늘(KST) 참여 기간에 걸친 미션만 조회한다. (교정 3: 전체 조회 개선)
+     * <p>
+     * 일자 컬럼으로 1차 필터링(인덱스 {@code idx_mission_entry_period})하고,
+     * 시·분·초까지의 정확한 기간 판단({@code entry_start_at <= 현재 < entry_end_at})은 서비스의 참여 정책에서 한다.
+     */
+    @Query("""
+            select m from Mission m
+             where m.entryStartDate <= :today
+               and m.entryEndDate >= :today
+             order by m.missionId
+            """)
+    List<Mission> findEntryPeriodMissions(@Param("today") String today);
 
     /**
      * 미션 행에 비관적 쓰기 락(SELECT ... FOR UPDATE)을 건다.

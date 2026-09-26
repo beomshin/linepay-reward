@@ -1,7 +1,9 @@
 package com.linepay.reward.reward.service;
 
+import com.linepay.reward.mission.domain.MissionItem;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -15,9 +17,9 @@ public class RewardRandomizer {
     public static final int POINT_MIN = 5;
     public static final int POINT_MAX = 10;
 
-    /** [0, bound) 범위의 인덱스 - 지급 가능한 보상 아이템 중 하나를 고를 때 사용 */
-    public int nextIndex(int bound) {
-        return ThreadLocalRandom.current().nextInt(bound);
+    /** 지급 가능한 보상 아이템 중 하나를 무작위로 선택 (후보 목록의 순서와 무관) */
+    public MissionItem pick(List<MissionItem> candidates) {
+        return candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
     }
 
     /** 5 이상 10 이하의 리워드 포인트 */

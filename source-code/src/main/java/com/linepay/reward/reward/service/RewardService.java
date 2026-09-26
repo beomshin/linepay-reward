@@ -2,6 +2,7 @@ package com.linepay.reward.reward.service;
 
 import com.linepay.reward.common.exception.BusinessException;
 import com.linepay.reward.common.exception.ErrorCode;
+import com.linepay.reward.common.number.BusinessNumberGenerator;
 import com.linepay.reward.common.time.KstTime;
 import com.linepay.reward.coupon.CouponApiException;
 import com.linepay.reward.coupon.CouponClient;
@@ -48,6 +49,7 @@ public class RewardService {
     private final CouponClient couponClient;
     private final RewardRandomizer randomizer;
     private final UserValidator userValidator;
+    private final BusinessNumberGenerator numberGenerator;
     private final Clock clock;
 
     /**
@@ -57,34 +59,35 @@ public class RewardService {
      * 따라서 반복·동시 요청이 들어와도 보상은 최대 한 번만 지급된다.
      */
     @Transactional
-    public RewardResponse requestReward(String userId, Long participationId) {
-        log.info("[REWARD] 보상 지급 요청 시작 userId={} participationId={}", userId, participationId);
+    public RewardResponse requestReward(String userId, String participationNo) {
+        log.info("[REWARD] 보상 지급 요청 시작 userId={} participationNo={}", userId, participationNo);
         userValidator.validateExists(userId);
 
         // 1) [DB] 참여 이력 행 락 획득 + 소유자 확인 (다른 사용자의 이력은 존재 여부를 드러내지 않도록 404)
-        MissionParticipation participation = participationRepository.findByIdForUpdate(participationId)
+        MissionParticipation participation = participationRepository.findByParticipationNoForUpdate(participationNo)
                 .filter(p -> p.isOwnedBy(userId))
                 .orElseThrow(() -> {
-                    log.info("[REWARD] 참여 이력 없음 또는 소유자 불일치 userId={} participationId={}", userId, participationId);
+                    log.info("[REWARD] 참여 이력 없음 또는 소유자 불일치 userId={} participationNo={}", userId, participationNo);
                     return new BusinessException(ErrorCode.PARTICIPATION_NOT_FOUND);
                 });
-        log.info("[REWARD] 참여 이력 락 획득 participationId={} missionId={}", participationId, participation.getMissionId());
+        log.info("[REWARD] 참여 이력 락 획득 participationNo={} missionId={}", participationNo, participation.getMissionId());
 
         // 2) [DB] 기존 보상 결과 조회: 참여 이력 1건당 보상 1회 (지급 완료면 거절, NO_REWARD 였으면 같은 행으로 재시도)
-        Optional<Reward> existing = rewardRepository.findByParticipationId(participationId);
-        log.info("[REWARD] 기존 보상 결과 조회 participationId={} 상태={}", participationId,
+        Optional<Reward> existing = rewardRepository.findByParticipationNo(participationNo);
+        log.info("[REWARD] 기존 보상 결과 조회 participationNo={} 상태={}", participationNo,
                 existing.map(r -> r.getRewardStatus().name()).orElse("없음"));
-        Reward reward = existing.orElseGet(() -> Reward.of(participation));
+        // 첫 요청이면 리워드번호를 채번해 새 보상 결과를 만든다. (NO_REWARD 재시도는 기존 리워드번호 유지)
+        Reward reward = existing.orElseGet(() -> Reward.of(numberGenerator.nextRewardNo(KstTime.now(clock)), participation));
         if (reward.isGranted()) {
-            log.info("[REWARD] 이미 보상 지급됨 participationId={}", participationId);
+            log.info("[REWARD] 이미 보상 지급됨 participationNo={}", participationNo);
             throw new BusinessException(ErrorCode.REWARD_ALREADY_GRANTED);
         }
 
         // 3) 보상 선정·지급 후 [DB] 결과 저장
         grantOrMarkNoReward(participation, reward, KstTime.now(clock));
         Reward saved = rewardRepository.save(reward);
-        log.info("[REWARD] 보상 결과 저장 완료 participationId={} 상태={} 아이템={} 유형={} 포인트={} couponId={}",
-                participationId, saved.getRewardStatus(), saved.getMissionItemId(), saved.getItemType(),
+        log.info("[REWARD] 보상 결과 저장 완료 rewardNo={} participationNo={} 상태={} 아이템={} 유형={} 포인트={} couponId={}",
+                saved.getRewardNo(), participationNo, saved.getRewardStatus(), saved.getMissionItemId(), saved.getItemType(),
                 saved.getPointAmount(), saved.getCouponId());
         return RewardResponse.from(saved);
     }
@@ -93,26 +96,26 @@ public class RewardService {
      * 보상 지급 결과 조회.
      */
     @Transactional(readOnly = true)
-    public RewardResponse getReward(String userId, Long participationId) {
-        log.info("[REWARD] 보상 결과 조회 시작 userId={} participationId={}", userId, participationId);
+    public RewardResponse getReward(String userId, String participationNo) {
+        log.info("[REWARD] 보상 결과 조회 시작 userId={} participationNo={}", userId, participationNo);
         userValidator.validateExists(userId);
 
         // [DB] 참여 이력 조회 + 소유자 확인
-        participationRepository.findById(participationId)
+        participationRepository.findByParticipationNo(participationNo)
                 .filter(p -> p.isOwnedBy(userId))
                 .orElseThrow(() -> {
-                    log.info("[REWARD] 참여 이력 없음 또는 소유자 불일치 userId={} participationId={}", userId, participationId);
+                    log.info("[REWARD] 참여 이력 없음 또는 소유자 불일치 userId={} participationNo={}", userId, participationNo);
                     return new BusinessException(ErrorCode.PARTICIPATION_NOT_FOUND);
                 });
 
         // [DB] 보상 결과 조회
-        Reward reward = rewardRepository.findByParticipationId(participationId)
+        Reward reward = rewardRepository.findByParticipationNo(participationNo)
                 .orElseThrow(() -> {
-                    log.info("[REWARD] 보상 요청 이력 없음 participationId={}", participationId);
+                    log.info("[REWARD] 보상 요청 이력 없음 participationNo={}", participationNo);
                     return new BusinessException(ErrorCode.REWARD_NOT_FOUND);
                 });
-        log.info("[REWARD] 보상 결과 조회 완료 participationId={} 상태={} 유형={}",
-                participationId, reward.getRewardStatus(), reward.getItemType());
+        log.info("[REWARD] 보상 결과 조회 완료 participationNo={} 상태={} 유형={}",
+                participationNo, reward.getRewardStatus(), reward.getItemType());
         return RewardResponse.from(reward);
     }
 
@@ -121,7 +124,7 @@ public class RewardService {
      */
     private void grantOrMarkNoReward(MissionParticipation participation, Reward reward, LocalDateTime now) {
         // [DB] 미션의 보상 아이템 목록 조회
-        List<MissionItem> items = missionItemRepository.findByMissionIdOrderByMissionItemIdAsc(participation.getMissionId());
+        List<MissionItem> items = missionItemRepository.findByMission(participation.getMissionId());
         log.info("[REWARD] 보상 아이템 조회 missionId={} 건수={} 아이템={}", participation.getMissionId(), items.size(),
                 items.stream().map(i -> i.getMissionItemId() + "(" + i.getItemType() + ")").toList());
 
@@ -147,7 +150,7 @@ public class RewardService {
                 candidates.stream().map(MissionItem::getMissionItemId).toList());
 
         while (!candidates.isEmpty()) {
-            MissionItem picked = candidates.get(randomizer.nextIndex(candidates.size()));
+            MissionItem picked = randomizer.pick(candidates);
             log.info("[REWARD] 보상 아이템 무작위 선택 아이템={} 유형={} (후보 {}건 중)",
                     picked.getMissionItemId(), picked.getItemType(), candidates.size());
 
@@ -183,7 +186,7 @@ public class RewardService {
         }
 
         // 지급 가능한 보상이 하나도 없음 → 지급하지 않고 결과 반환 (재요청 가능)
-        log.info("[REWARD] 지급 가능한 보상 없음 → NO_REWARD participationId={}", participation.getParticipationId());
+        log.info("[REWARD] 지급 가능한 보상 없음 → NO_REWARD participationNo={}", participation.getParticipationNo());
         reward.markNoReward(now);
     }
 
@@ -222,10 +225,10 @@ public class RewardService {
 
     /**
      * 외부 쿠폰 발급 requestId (멱등 키).
-     * 참여 이력 + 쿠폰 템플릿 기준으로 결정적으로 생성하므로, 같은 참여 이력의 재시도는
+     * 참여 이력번호 + 쿠폰 템플릿 기준으로 결정적으로 생성하므로, 같은 참여 이력의 재시도는
      * 외부 시스템에서 기존 발급 결과를 돌려받아 쿠폰이 중복 발급되지 않는다.
      */
     static String couponRequestId(MissionParticipation participation, MissionItem item) {
-        return "REWARD_" + participation.getParticipationId() + "_" + item.getCouponTemplateId();
+        return "REWARD_" + participation.getParticipationNo() + "_" + item.getCouponTemplateId();
     }
 }

@@ -32,8 +32,8 @@ class RewardServiceTest extends IntegrationTestSupport {
     @Autowired
     RewardService rewardService;
 
-    private Long complete(String userId, String missionId) {
-        return missionService.completeMission(userId, missionId).participationId();
+    private String complete(String userId, String missionId) {
+        return missionService.completeMission(userId, missionId).participationNo();
     }
 
     private ErrorCode errorOf(Runnable action) {
@@ -56,9 +56,9 @@ class RewardServiceTest extends IntegrationTestSupport {
     @Test
     @DisplayName("QA-R01 포인트 전용 미션(0003) 보상은 5 이상 10 이하 포인트")
     void pointReward() {
-        Long participationId = complete("USER_0001", "MISSION_0003");
+        String participationNo = complete("USER_0001", "MISSION_0003");
 
-        RewardResponse reward = rewardService.requestReward("USER_0001", participationId);
+        RewardResponse reward = rewardService.requestReward("USER_0001", participationNo);
 
         assertThat(reward.rewardStatus()).isEqualTo(RewardStatus.GRANTED);
         assertThat(reward.itemType()).isEqualTo(ItemType.REWARD_POINT);
@@ -82,46 +82,46 @@ class RewardServiceTest extends IntegrationTestSupport {
     @Test
     @DisplayName("QA-R03 한 참여 이력에는 보상을 한 번만 지급 (재요청 시 REWARD_ALREADY_GRANTED, 결과 불변)")
     void rewardOnlyOnce() {
-        Long participationId = complete("USER_0001", "MISSION_0003");
-        RewardResponse first = rewardService.requestReward("USER_0001", participationId);
+        String participationNo = complete("USER_0001", "MISSION_0003");
+        RewardResponse first = rewardService.requestReward("USER_0001", participationNo);
 
-        assertThat(errorOf(() -> rewardService.requestReward("USER_0001", participationId)))
+        assertThat(errorOf(() -> rewardService.requestReward("USER_0001", participationNo)))
                 .isEqualTo(ErrorCode.REWARD_ALREADY_GRANTED);
-        assertThat(rewardService.getReward("USER_0001", participationId)).isEqualTo(first);
+        assertThat(rewardService.getReward("USER_0001", participationNo)).isEqualTo(first);
         assertThat(rewardRepository.count()).isEqualTo(1);
     }
 
     @Test
     @DisplayName("QA-R04 보상 요청 전 결과 조회는 REWARD_NOT_FOUND")
     void rewardNotRequestedYet() {
-        Long participationId = complete("USER_0001", "MISSION_0003");
+        String participationNo = complete("USER_0001", "MISSION_0003");
 
-        assertThat(errorOf(() -> rewardService.getReward("USER_0001", participationId)))
+        assertThat(errorOf(() -> rewardService.getReward("USER_0001", participationNo)))
                 .isEqualTo(ErrorCode.REWARD_NOT_FOUND);
     }
 
     @Test
     @DisplayName("QA-R05 다른 사용자의 참여 이력이나 없는 참여 이력은 PARTICIPATION_NOT_FOUND")
     void participationOwnership() {
-        Long participationId = complete("USER_0001", "MISSION_0003");
+        String participationNo = complete("USER_0001", "MISSION_0003");
 
-        assertThat(errorOf(() -> rewardService.requestReward("USER_0002", participationId)))
+        assertThat(errorOf(() -> rewardService.requestReward("USER_0002", participationNo)))
                 .isEqualTo(ErrorCode.PARTICIPATION_NOT_FOUND);
-        assertThat(errorOf(() -> rewardService.getReward("USER_0002", participationId)))
+        assertThat(errorOf(() -> rewardService.getReward("USER_0002", participationNo)))
                 .isEqualTo(ErrorCode.PARTICIPATION_NOT_FOUND);
-        assertThat(errorOf(() -> rewardService.requestReward("USER_0001", 999_999L)))
+        assertThat(errorOf(() -> rewardService.requestReward("USER_0001", "PT_NOT_EXISTS")))
                 .isEqualTo(ErrorCode.PARTICIPATION_NOT_FOUND);
-        assertThat(errorOf(() -> rewardService.requestReward("NO_USER", participationId)))
+        assertThat(errorOf(() -> rewardService.requestReward("NO_USER", participationNo)))
                 .isEqualTo(ErrorCode.USER_NOT_FOUND);
     }
 
     @Test
     @DisplayName("QA-R06 MISSION_0002 에서 쿠폰이 선택되면 외부 시스템으로 쿠폰 1개가 발급된다")
     void couponReward() {
-        Long participationId = complete("USER_0001", "MISSION_0002");
-        randomizer.forceIndexes(1); // [ITEM_0002(포인트), ITEM_0003(쿠폰)] 중 쿠폰 선택
+        String participationNo = complete("USER_0001", "MISSION_0002");
+        randomizer.forcePicks("ITEM_0003"); // [ITEM_0002(포인트), ITEM_0003(쿠폰)] 중 쿠폰 선택
 
-        RewardResponse reward = rewardService.requestReward("USER_0001", participationId);
+        RewardResponse reward = rewardService.requestReward("USER_0001", participationNo);
 
         assertThat(reward.rewardStatus()).isEqualTo(RewardStatus.GRANTED);
         assertThat(reward.itemType()).isEqualTo(ItemType.COUPON);
@@ -135,9 +135,9 @@ class RewardServiceTest extends IntegrationTestSupport {
     @DisplayName("QA-R07 MISSION_0002 는 무작위 선택으로 포인트와 쿠폰이 모두 지급될 수 있다")
     void randomSelectionCoversBothTypes() {
         Set<ItemType> types = EnumSet.noneOf(ItemType.class);
-        randomizer.forceIndexes(0);
+        randomizer.forcePicks("ITEM_0002");
         types.add(rewardService.requestReward("USER_0001", complete("USER_0001", "MISSION_0002")).itemType());
-        randomizer.forceIndexes(1);
+        randomizer.forcePicks("ITEM_0003");
         types.add(rewardService.requestReward("USER_0002", complete("USER_0002", "MISSION_0002")).itemType());
 
         assertThat(types).containsExactlyInAnyOrder(ItemType.REWARD_POINT, ItemType.COUPON);
@@ -148,7 +148,7 @@ class RewardServiceTest extends IntegrationTestSupport {
     void inactiveCouponExcluded() {
         couponSystem.changeStatus(COUPON_TEMPLATE, CouponTemplateStatus.INACTIVE);
         for (String user : new String[]{"USER_0001", "USER_0002", "USER_0003"}) {
-            randomizer.forceIndexes(1); // 제외되지 않았다면 쿠폰이 선택될 인덱스
+            randomizer.forcePicks("ITEM_0003"); // 제외되지 않았다면 선택될 쿠폰 아이템
             RewardResponse reward = rewardService.requestReward(user, complete(user, "MISSION_0002"));
             assertThat(reward.itemType()).isEqualTo(ItemType.REWARD_POINT);
         }
@@ -159,7 +159,7 @@ class RewardServiceTest extends IntegrationTestSupport {
     @DisplayName("QA-R09 쿠폰 한도 소진(EXHAUSTED)이면 선택 대상에서 제외된다")
     void exhaustedCouponExcluded() {
         couponSystem.registerTemplate(COUPON_TEMPLATE, "10% 할인 쿠폰", 100, 100, CouponTemplateStatus.EXHAUSTED);
-        randomizer.forceIndexes(1);
+        randomizer.forcePicks("ITEM_0003");
 
         RewardResponse reward = rewardService.requestReward("USER_0001", complete("USER_0001", "MISSION_0002"));
 
@@ -171,17 +171,17 @@ class RewardServiceTest extends IntegrationTestSupport {
     void noRewardThenRetry() {
         String missionId = couponOnlyMission(COUPON_TEMPLATE);
         couponSystem.changeStatus(COUPON_TEMPLATE, CouponTemplateStatus.INACTIVE);
-        Long participationId = complete("USER_0001", missionId);
+        String participationNo = complete("USER_0001", missionId);
 
-        RewardResponse noReward = rewardService.requestReward("USER_0001", participationId);
+        RewardResponse noReward = rewardService.requestReward("USER_0001", participationNo);
         assertThat(noReward.rewardStatus()).isEqualTo(RewardStatus.NO_REWARD);
         assertThat(noReward.itemType()).isNull();
-        assertThat(rewardService.getReward("USER_0001", participationId).rewardStatus()).isEqualTo(RewardStatus.NO_REWARD);
+        assertThat(rewardService.getReward("USER_0001", participationNo).rewardStatus()).isEqualTo(RewardStatus.NO_REWARD);
 
         // 쿠폰 발급 재개 후 같은 참여 이력으로 재요청
         couponSystem.changeStatus(COUPON_TEMPLATE, CouponTemplateStatus.AVAILABLE);
         clock.advance(Duration.ofMinutes(5));
-        RewardResponse granted = rewardService.requestReward("USER_0001", participationId);
+        RewardResponse granted = rewardService.requestReward("USER_0001", participationNo);
 
         assertThat(granted.rewardStatus()).isEqualTo(RewardStatus.GRANTED);
         assertThat(granted.itemType()).isEqualTo(ItemType.COUPON);
@@ -203,12 +203,12 @@ class RewardServiceTest extends IntegrationTestSupport {
     @DisplayName("QA-R12 외부 발급은 성공했지만 저장 전에 실패했던 경우, 재요청 시 같은 쿠폰으로 복구된다")
     void recoverAlreadyIssuedCoupon() {
         String missionId = couponOnlyMission(COUPON_TEMPLATE);
-        Long participationId = complete("USER_0001", missionId);
-        // 이전 시도에서 외부 발급만 성공한 상황을 재현 (requestId 규칙: REWARD_{participationId}_{templateId})
+        String participationNo = complete("USER_0001", missionId);
+        // 이전 시도에서 외부 발급만 성공한 상황을 재현 (requestId 규칙: REWARD_{participationNo}_{templateId})
         CouponIssueResponse issuedBefore = couponSystem.issueCoupon(new CouponIssueRequest(
-                "REWARD_" + participationId + "_" + COUPON_TEMPLATE, "USER_0001", COUPON_TEMPLATE));
+                "REWARD_" + participationNo + "_" + COUPON_TEMPLATE, "USER_0001", COUPON_TEMPLATE));
 
-        RewardResponse reward = rewardService.requestReward("USER_0001", participationId);
+        RewardResponse reward = rewardService.requestReward("USER_0001", participationNo);
 
         assertThat(reward.couponId()).isEqualTo(issuedBefore.couponId());
         assertThat(couponSystem.getCouponTemplate(COUPON_TEMPLATE).issuedQuantity()).isEqualTo(1);

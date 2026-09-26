@@ -56,7 +56,7 @@ public class GlobalExceptionHandler {
         return toValidationResponse(classify(constraint), field);
     }
 
-    /** 경로 변수 타입 불일치 (예: participationId 에 숫자가 아닌 값) → 형식 오류 */
+    /** 경로 변수 타입 불일치 (숫자형 경로 변수에 숫자가 아닌 값) → 형식 오류 */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
         return toValidationResponse(ErrorCode.INVALID_FORMAT, e.getName());

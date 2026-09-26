@@ -1,6 +1,69 @@
 # 테스트 실행 결과
 
-## 0. 최신 실행 (교정 2 적용 후: 환경 설정 분리 · logback · MDC)
+## 0. 최신 실행 (교정 3 적용 후: 비즈니스 키 · JPQL 전환 · 인덱스)
+
+| 항목 | 값 |
+|---|---|
+| 실행일 | 2026-09-26 (KST) |
+| 명령 | `gradlew.bat clean test bootJar` |
+| 결과 | **102개 전체 통과** (기존 88 + 비즈니스 키 6 + 실행 계획 7 + 검증 테스트 변경 1) |
+
+| 테스트 클래스 | QA | 테스트 수 | 실패 |
+|---|---|---:|---:|
+| `unit.KstTimeTest` | QA-T | 3 | 0 |
+| `unit.ParticipationPolicyTest` | QA-P | 8 | 0 |
+| `unit.FakeCouponSystemTest` | QA-C | 8 | 0 |
+| `unit.TraceIdFilterTest` | QA-L | 5 | 0 |
+| `config.ProfileConfigTest` | QA-E | 6 | 0 |
+| `integration.MissionServiceTest` | QA-M | 12 | 0 |
+| `integration.RewardServiceTest` | QA-R | 13 | 0 |
+| `integration.CouponIssueFallbackTest` | QA-F | 2 | 0 |
+| `integration.ConcurrencyTest` | QA-X | 4 | 0 |
+| `integration.BusinessKeyTest` | QA-K | 6 | 0 |
+| `integration.ExplainPlanTest` | QA-I | 7 | 0 |
+| `api.RewardApiTest` | QA-A | 8 | 0 |
+| `api.RequestValidationApiTest` | QA-V | 16 | 0 |
+| `api.TraceIdLoggingTest` | QA-L | 4 | 0 |
+| **합계** | | **102** | **0** |
+
+교정 3 완료 조건 확인
+
+| 완료 조건 | 결과 |
+|---|---|
+| 동시 요청에서 이력번호·리워드번호 중복 없음, 유니크 제약 동작 | QA-K01~K06 통과. 채번 300건·미션 완료 100건·보상 50건 동시 실행에서 중복 0건. 같은 번호 저장 시 `DataIntegrityViolationException` |
+| JPQL 전환 후 기존 테스트 통과 (조회 결과 동일) | 기존 미션·보상·동시성·API 테스트 모두 통과. API 식별자 변경(participationId → participationNo)에 맞춰 테스트 입력값만 수정 |
+| EXPLAIN으로 설계 인덱스 사용, 불필요한 정렬 제거 확인 | QA-I01~I07 통과 (아래 실행 계획) |
+
+실행 계획 요약 (H2 `EXPLAIN`, 사용 인덱스 주석 부분)
+
+| 조회 | 실행 계획 |
+|---|---|
+| 미션 전체 참여 수 | `/* PUBLIC.IDX_PARTICIPATION_MISSION_USER_DATETIME: MISSION_ID = 'MISSION_0002' */` |
+| 사용자 당일 참여 수 | `/* PUBLIC.IDX_PARTICIPATION_MISSION_USER_DATETIME: PARTICIPATED_DATE = '20260801' AND MISSION_ID = 'MISSION_0002' AND USER_ID = 'USER_0001' */` |
+| 사용자 직전 참여 1건 | `/* PUBLIC.IDX_PARTICIPATION_MISSION_USER_DATETIME: MISSION_ID = 'MISSION_0002' AND USER_ID = 'USER_0001' */ ... ORDER BY 2 DESC, 1 DESC FETCH FIRST ROW ONLY` |
+| 이력번호 단건 | `/* PUBLIC.UK_PARTICIPATION_NO_INDEX_7: PARTICIPATION_NO = '...' */` |
+| 이력번호로 보상 결과 | `/* PUBLIC.UK_REWARD_PARTICIPATION_NO_INDEX_8: PARTICIPATION_NO = '...' */` |
+| 보상 아이템 | `/* PUBLIC.IDX_MISSION_ITEM_MISSION: MISSION_ID = 'MISSION_0002' */` (ORDER BY 없음) |
+| 참여 기간 미션 | `/* PUBLIC.IDX_MISSION_ENTRY_PERIOD: ENTRY_START_DATE <= '20260901' AND ENTRY_END_DATE >= '20260901' */ ... ORDER BY 5` |
+
+- 직전 참여 조회는 인덱스로 (미션, 사용자) 범위를 찾은 뒤 H2가 그 범위 안에서 역순 정렬합니다. 같은 사용자·미션의 이력만 정렬하므로 비용이 작지만, H2 실행 계획에 "index sorted"(정렬 생략)는 나오지 않았습니다.
+- 참여 기간 미션 조회의 `ORDER BY mission_id`는 응답 순서를 고정하려고 남겼습니다. 기간 조건으로 걸러진 소수의 행만 정렬합니다.
+
+실제 서버(local) 확인: 미션 완료 응답 `participationNo=PT202609010000000001`, 보상 응답 `rewardNo=RW202609010000000001`, DB PK(`/reward/USER_0001/1`)로 요청하면 `PARTICIPATION_NOT_FOUND`
+
+실행 중 발견한 사항
+
+| 회차 | 결과 | 원인 | 조치 |
+|---|---|---|---|
+| 1회차 | 컴파일 실패 | `RewardService.getReward`의 `findByParticipationId` 호출 1곳이 바뀌지 않음 | `findByParticipationNo`로 수정 |
+| 2회차 | 102/102 통과 | 실행 계획 확인 결과 참여 기간 미션 조회도 `idx_mission_entry_period`를 사용 | QA-I07에 인덱스 이름 확인 추가 |
+| 3회차 | 102/102 통과 | - | - |
+
+---
+
+## 이전 실행 기록 (교정 2)
+
+### 교정 2 적용 후: 환경 설정 분리 · logback · MDC
 
 | 항목 | 값 |
 |---|---|

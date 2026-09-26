@@ -59,22 +59,24 @@ class RewardApiTest extends IntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0000"))
                 .andExpect(jsonPath("$.data.missionId").value("MISSION_0003"))
+                .andExpect(jsonPath("$.data.participationNo").value(org.hamcrest.Matchers.matchesPattern("PT20260901\\d{10}")))
                 .andExpect(jsonPath("$.data.participatedDate").value("20260901"))
                 .andExpect(jsonPath("$.data.participatedTime").value("120000"))
                 .andReturn();
-        long participationId = body(completed).path("data").path("participationId").asLong();
+        String participationNo = body(completed).path("data").path("participationNo").asText();
 
         // 4. 보상 지급 요청
-        mockMvc.perform(post("/linepay/v1/reward/USER_0001/" + participationId))
+        mockMvc.perform(post("/linepay/v1/reward/USER_0001/" + participationNo))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.rewardStatus").value("GRANTED"))
+                .andExpect(jsonPath("$.data.rewardNo").value(org.hamcrest.Matchers.matchesPattern("RW20260901\\d{10}")))
                 .andExpect(jsonPath("$.data.itemType").value("REWARD_POINT"))
                 .andExpect(jsonPath("$.data.pointAmount").value(anyOf(is(5), is(6), is(7), is(8), is(9), is(10))));
 
         // 5. 보상 지급 결과 확인
-        mockMvc.perform(get("/linepay/v1/reward/USER_0001/" + participationId))
+        mockMvc.perform(get("/linepay/v1/reward/USER_0001/" + participationNo))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.participationId").value(participationId))
+                .andExpect(jsonPath("$.data.participationNo").value(participationNo))
                 .andExpect(jsonPath("$.data.rewardStatus").value("GRANTED"));
     }
 
@@ -120,14 +122,14 @@ class RewardApiTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data").value(nullValue()));
 
         MvcResult completed = mockMvc.perform(post("/linepay/v1/mission/USER_0001/MISSION_0003/complete")).andReturn();
-        long participationId = body(completed).path("data").path("participationId").asLong();
+        String participationNo = body(completed).path("data").path("participationNo").asText();
 
         mockMvc.perform(post("/linepay/v1/mission/USER_0001/MISSION_0003/complete"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("MISSION_REENTRY_COOLDOWN"));
 
-        mockMvc.perform(post("/linepay/v1/reward/USER_0001/" + participationId)).andExpect(status().isOk());
-        mockMvc.perform(post("/linepay/v1/reward/USER_0001/" + participationId))
+        mockMvc.perform(post("/linepay/v1/reward/USER_0001/" + participationNo)).andExpect(status().isOk());
+        mockMvc.perform(post("/linepay/v1/reward/USER_0001/" + participationNo))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("REWARD_ALREADY_GRANTED"));
     }
@@ -136,20 +138,22 @@ class RewardApiTest extends IntegrationTestSupport {
     @DisplayName("QA-A05 보상 요청 전 결과 조회 → 404 REWARD_NOT_FOUND")
     void rewardNotFound() throws Exception {
         MvcResult completed = mockMvc.perform(post("/linepay/v1/mission/USER_0001/MISSION_0003/complete")).andReturn();
-        long participationId = body(completed).path("data").path("participationId").asLong();
+        String participationNo = body(completed).path("data").path("participationNo").asText();
 
-        mockMvc.perform(get("/linepay/v1/reward/USER_0001/" + participationId))
+        mockMvc.perform(get("/linepay/v1/reward/USER_0001/" + participationNo))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("REWARD_NOT_FOUND"));
     }
 
     @Test
-    @DisplayName("QA-A06 400: participationId 형식 오류 → INVALID_FORMAT")
-    void badRequest() throws Exception {
-        mockMvc.perform(post("/linepay/v1/reward/USER_0001/abc"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_FORMAT"))
-                .andExpect(jsonPath("$.msg").value("요청값 형식이 올바르지 않습니다. (participationId)"))
+    @DisplayName("QA-A06 404: 이력번호가 아닌 값(DB PK 숫자 등)으로 보상 요청 → PARTICIPATION_NOT_FOUND")
+    void pkIsNotAccepted() throws Exception {
+        mockMvc.perform(post("/linepay/v1/mission/USER_0001/MISSION_0003/complete")).andExpect(status().isOk());
+
+        // 참여 이력의 DB PK(1)는 API 식별자로 쓰이지 않는다
+        mockMvc.perform(post("/linepay/v1/reward/USER_0001/1"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PARTICIPATION_NOT_FOUND"))
                 .andExpect(jsonPath("$.data").value(nullValue()));
     }
 
@@ -173,9 +177,9 @@ class RewardApiTest extends IntegrationTestSupport {
         createMission(missionId);
         createCouponItem(TEST_PREFIX + "ITEM_C", missionId, "COUPON_TEMPLATE_UNKNOWN");
         MvcResult completed = mockMvc.perform(post("/linepay/v1/mission/USER_0001/" + missionId + "/complete")).andReturn();
-        long participationId = body(completed).path("data").path("participationId").asLong();
+        String participationNo = body(completed).path("data").path("participationNo").asText();
 
-        mockMvc.perform(post("/linepay/v1/reward/USER_0001/" + participationId))
+        mockMvc.perform(post("/linepay/v1/reward/USER_0001/" + participationNo))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0000"))
                 .andExpect(jsonPath("$.data.rewardStatus").value("NO_REWARD"))

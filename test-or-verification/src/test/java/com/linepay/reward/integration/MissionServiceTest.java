@@ -56,7 +56,7 @@ class MissionServiceTest extends IntegrationTestSupport {
     void completeCreatesParticipation() {
         ParticipationResponse response = missionService.completeMission("USER_0001", "MISSION_0002");
 
-        assertThat(response.participationId()).isNotNull();
+        assertThat(response.participationNo()).isNotNull();
         assertThat(response.participatedDate()).isEqualTo("20260901");
         assertThat(response.participatedTime()).isEqualTo("120000");
         assertThat(participationRepository.count()).isEqualTo(1);
@@ -65,9 +65,9 @@ class MissionServiceTest extends IntegrationTestSupport {
     @Test
     @DisplayName("QA-M04 참여 이력은 요청마다 서로 다른 ID 로 구분된다")
     void participationsAreDistinguishable() {
-        Long first = missionService.completeMission("USER_0001", "MISSION_0002").participationId();
+        String first = missionService.completeMission("USER_0001", "MISSION_0002").participationNo();
         clock.advance(Duration.ofHours(1));
-        Long second = missionService.completeMission("USER_0001", "MISSION_0002").participationId();
+        String second = missionService.completeMission("USER_0001", "MISSION_0002").participationNo();
 
         assertThat(first).isNotEqualTo(second);
     }
@@ -103,7 +103,7 @@ class MissionServiceTest extends IntegrationTestSupport {
 
         clock.advance(Duration.ofSeconds(1));
         assertThat(availableMissionIds("USER_0001")).containsExactly("MISSION_0002", "MISSION_0003");
-        assertThat(missionService.completeMission("USER_0001", "MISSION_0002").participationId()).isNotNull();
+        assertThat(missionService.completeMission("USER_0001", "MISSION_0002").participationNo()).isNotNull();
     }
 
     @Test
@@ -148,7 +148,7 @@ class MissionServiceTest extends IntegrationTestSupport {
         // 100번째 참여는 가능
         missionService.completeMission("USER_0001", "MISSION_0003");
 
-        assertThat(participationRepository.countByMissionId("MISSION_0003")).isEqualTo(100);
+        assertThat(participationRepository.countByMission("MISSION_0003")).isEqualTo(100);
         assertThat(errorOf(() -> missionService.completeMission("USER_0003", "MISSION_0003")))
                 .isEqualTo(ErrorCode.MISSION_TOTAL_LIMIT_EXCEEDED);
         assertThat(availableMissionIds("USER_0003")).containsExactly("MISSION_0002");
@@ -161,7 +161,7 @@ class MissionServiceTest extends IntegrationTestSupport {
         for (int i = 0; i < 5; i++) {
             errorOf(() -> missionService.completeMission("USER_0001", "MISSION_0002"));
         }
-        assertThat(participationRepository.countByMissionId("MISSION_0002")).isEqualTo(1);
+        assertThat(participationRepository.countByMission("MISSION_0002")).isEqualTo(1);
     }
 
     @Test

@@ -6,6 +6,7 @@ import com.linepay.reward.reward.domain.RewardStatus;
 
 /**
  * 보상 지급 요청/결과 조회 응답.
+ * 보상 결과는 리워드번호(rewardNo), 대상 참여 이력은 이력번호(participationNo)로 식별한다.
  * <ul>
  *     <li>포인트 지급: rewardStatus=GRANTED, itemType=REWARD_POINT, pointAmount=5~10</li>
  *     <li>쿠폰 지급  : rewardStatus=GRANTED, itemType=COUPON, couponTemplateId/couponId</li>
@@ -13,7 +14,8 @@ import com.linepay.reward.reward.domain.RewardStatus;
  * </ul>
  */
 public record RewardResponse(
-        Long participationId,
+        String rewardNo,
+        String participationNo,
         String missionId,
         String userId,
         RewardStatus rewardStatus,
@@ -27,7 +29,8 @@ public record RewardResponse(
 ) {
     public static RewardResponse from(Reward reward) {
         return new RewardResponse(
-                reward.getParticipationId(),
+                reward.getRewardNo(),
+                reward.getParticipationNo(),
                 reward.getMissionId(),
                 reward.getUserId(),
                 reward.getRewardStatus(),

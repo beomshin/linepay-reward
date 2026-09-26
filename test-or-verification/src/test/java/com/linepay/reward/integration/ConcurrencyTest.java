@@ -86,7 +86,7 @@ class ConcurrencyTest extends IntegrationTestSupport {
 
         assertThat(counts.get("SUCCESS").get()).isEqualTo(1);
         assertThat(counts.get(ErrorCode.MISSION_REENTRY_COOLDOWN).get()).isEqualTo(19);
-        assertThat(participationRepository.countByMissionId("MISSION_0002")).isEqualTo(1);
+        assertThat(participationRepository.countByMission("MISSION_0002")).isEqualTo(1);
     }
 
     @Test
@@ -103,16 +103,16 @@ class ConcurrencyTest extends IntegrationTestSupport {
 
         assertThat(counts.get("SUCCESS").get()).isEqualTo(100);
         assertThat(counts.get(ErrorCode.MISSION_TOTAL_LIMIT_EXCEEDED).get()).isEqualTo(30);
-        assertThat(participationRepository.countByMissionId("MISSION_0003")).isEqualTo(100);
+        assertThat(participationRepository.countByMission("MISSION_0003")).isEqualTo(100);
     }
 
     @Test
     @DisplayName("QA-X03 같은 참여 이력에 보상 요청 10번 동시 전송 시 1번만 지급된다")
     void sameParticipationConcurrentReward() throws Exception {
-        Long participationId = missionService.completeMission("USER_0001", "MISSION_0002").participationId();
+        String participationNo = missionService.completeMission("USER_0001", "MISSION_0002").participationNo();
         List<Callable<Object>> tasks = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
-            tasks.add(() -> rewardService.requestReward("USER_0001", participationId));
+            tasks.add(() -> rewardService.requestReward("USER_0001", participationNo));
         }
 
         Map<Object, AtomicInteger> counts = countBy(runConcurrently(tasks));
@@ -136,8 +136,8 @@ class ConcurrencyTest extends IntegrationTestSupport {
         for (int i = 0; i < 10; i++) {
             String userId = TEST_PREFIX + "USER_" + i;
             createUser(userId);
-            Long participationId = missionService.completeMission(userId, missionId).participationId();
-            tasks.add(() -> rewardService.requestReward(userId, participationId));
+            String participationNo = missionService.completeMission(userId, missionId).participationNo();
+            tasks.add(() -> rewardService.requestReward(userId, participationNo));
         }
 
         List<Object> results = runConcurrently(tasks);

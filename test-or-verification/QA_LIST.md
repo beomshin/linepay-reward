@@ -16,6 +16,8 @@
 | QA-V | `api/RequestValidationApiTest` | API (MockMvc, 요청값 검증) |
 | QA-E | `config/ProfileConfigTest` | 단위 (프로파일 설정 분리) |
 | QA-L | `unit/TraceIdFilterTest`, `api/TraceIdLoggingTest` | 단위 + API (MDC traceId, 로그) |
+| QA-K | `integration/BusinessKeyTest` | 통합 (비즈니스 키 채번, 유니크 제약) |
+| QA-I | `integration/ExplainPlanTest` | 통합 (실행 계획, 인덱스) |
 
 ## 1. 시간 기준 (과제 9절, 프롬프트 9절)
 
@@ -111,7 +113,7 @@
 | QA-A03 | 404 응답 `code`=영문 사유 코드, `msg`=한글 메시지, `data: null` (data 키가 있어야 함) |
 | QA-A04 | 409 응답 (기간 외, 재참여 제한, 중복 보상) |
 | QA-A05 | 보상 요청 전 조회 → 404 REWARD_NOT_FOUND |
-| QA-A06 | 경로 변수 형식 오류 → 400 INVALID_FORMAT |
+| QA-A06 | 이력번호가 아닌 DB PK 숫자로 보상 요청 → 404 PARTICIPATION_NOT_FOUND (PK 비노출) |
 | QA-A07 | 정의되지 않은 경로(404), 허용되지 않은 메서드(405)도 공통 포맷 |
 | QA-A08 | NO_REWARD는 200 정상 응답 |
 
@@ -124,9 +126,9 @@
 | QA-V03 | 형식 제한 없음: 특수문자·공백·한글(`-`, 공백, 한글, `@`, `.`)이 있는 userId → 검증 통과 후 404 USER_NOT_FOUND (5건) |
 | QA-V04 | 길이 제한 없음: 50자 초과 userId → 검증 통과 후 404 USER_NOT_FOUND |
 | QA-V05 | 형식 제한 없음: 특수문자가 있는 missionId → 404 MISSION_NOT_FOUND, 참여 이력 생성 안 됨 |
-| QA-V06 | 숫자가 아닌 participationId(`abc`, `1.5`) → 400 INVALID_FORMAT |
-| QA-V07 | 0 이하 participationId(`0`, `-1`, `-9999`) → 400 OUT_OF_RANGE (요청·조회 모두, 3건) |
-| QA-V08 | Long 범위를 넘는 숫자 → 400 INVALID_FORMAT |
+| QA-V06 | 공백 participationNo → 400 MISSING_REQUIRED_VALUE (요청·조회) |
+| QA-V07 | 존재하지 않는 이력번호(`abc`, `0`, `-1`, 미발급 번호) → 404 PARTICIPATION_NOT_FOUND (4건) |
+| QA-V08 | 정상 발급된 이력번호로 결과 조회 → 요청 전이면 404 REWARD_NOT_FOUND |
 | QA-V09 | 형식이 맞는 값은 기존 비즈니스 검증으로 이어짐 (없는 사용자 → 404 USER_NOT_FOUND) |
 
 ## 10. 환경 설정 분리 (교정 2)
@@ -154,7 +156,30 @@
 | QA-L08 | 연속 두 요청의 로그가 각자 traceId로 구분되고 섞이지 않음 |
 | QA-L09 | 보상 지급 요청의 참여 이력 락 획득·기존 보상 조회·보상 아이템 조회·포인트 결정·결과 저장 로그가 한 traceId로 이어짐 |
 
-## 12. 검증하지 못한 범위
+## 12. 비즈니스 키 채번 / 유니크 제약 (교정 3)
+
+| ID | 검증 항목 |
+|---|---|
+| QA-K01 | 채번기 동시 호출 300건(이력번호 150 + 리워드번호 150): 중복 없음, 형식 `(PT|RW)` + 일자 + 10자리 |
+| QA-K02 | 사용자 100명 동시 미션 완료: 응답과 DB의 이력번호 100개가 모두 다름 |
+| QA-K03 | 참여 이력 50건 보상 동시 요청: 리워드번호 50개 모두 다름 |
+| QA-K04 | 같은 이력번호로 두 번 저장 → DB 유니크 제약 위반 |
+| QA-K05 | 같은 리워드번호 / 같은 참여 이력에 보상 결과 두 번 저장 → DB 유니크 제약 위반 |
+| QA-K06 | NO_REWARD 후 재요청하면 같은 리워드번호 유지 |
+
+## 13. 조회 쿼리 실행 계획 (교정 3: EXPLAIN)
+
+| ID | 조회 | 확인한 인덱스 |
+|---|---|---|
+| QA-I01 | 미션 전체 참여 수 | `idx_participation_mission_user_datetime` |
+| QA-I02 | 사용자 당일 참여 수 | `idx_participation_mission_user_datetime` |
+| QA-I03 | 사용자 직전 참여 1건 | `idx_participation_mission_user_datetime` |
+| QA-I04 | 이력번호 단건 조회 | `uk_participation_no` |
+| QA-I05 | 이력번호로 보상 결과 조회 | `uk_reward_participation_no` |
+| QA-I06 | 보상 아이템 조회 | `idx_mission_item_mission`, ORDER BY 없음 |
+| QA-I07 | 참여 기간 미션 조회 | `idx_mission_entry_period` |
+
+## 14. 검증하지 못한 범위
 
 - 여러 애플리케이션 인스턴스와 공유 DB 환경에서의 동시성 (단일 JVM, H2에서만 검증)
 - 실제 HTTP 외부 쿠폰 시스템의 타임아웃·네트워크 오류 (재현체에서는 예외 주입으로만 확인)

@@ -36,10 +36,10 @@
 | 테이블 | 주요 컬럼 | 비고 |
 |---|---|---|
 | `users` | user_id(PK), user_name | `user`는 H2 예약어 |
-| `mission` | mission_id(PK), mission_type, title, entry_start_date/time, entry_end_date/time | 기간을 일자/시간 컬럼으로 분리 |
+| `mission` | mission_id(PK), mission_type, title, entry_start_date/time, entry_end_date/time | 기간을 일자/시간 컬럼으로 분리, 인덱스 `idx_mission_entry_period`(entry_start_date, entry_end_date) |
 | `mission_item` | mission_item_id(PK), mission_id, item_type, coupon_template_id | COUPON일 때만 템플릿 ID |
-| `mission_participation` | participation_id(PK, identity), mission_id, user_id, participated_date, participated_time | 인덱스 (mission_id, user_id, participated_date) |
-| `reward` | reward_id(PK), participation_id(**UNIQUE**), reward_status, mission_item_id, item_type, point_amount, coupon_template_id, coupon_id, coupon_request_id, processed_date/time | 참여 이력 1건당 최대 1행 |
+| `mission_participation` | participation_id(PK, 내부용), **participation_no(이력번호, UNIQUE)**, mission_id, user_id, participated_date, participated_time | 인덱스 `idx_participation_mission_user_datetime`(mission_id, user_id, participated_date, participated_time) |
+| `reward` | reward_id(PK, 내부용), **reward_no(리워드번호, UNIQUE)**, participation_no(**UNIQUE**), reward_status, mission_item_id, item_type, point_amount, coupon_template_id, coupon_id, coupon_request_id, processed_date/time | 참여 이력 1건당 최대 1행 |
 
 - 모든 일시는 KST이며, 일자와 시간을 컬럼으로 나눠 저장합니다.
 - 일별 참여 횟수는 `participated_date`(KST 일자)가 같은 이력의 수로 계산합니다. 이렇게 하면 "KST 당일 00:00:00 이상, 다음 날 00:00:00 미만" 규칙과 같아집니다.
@@ -82,7 +82,7 @@
 6. 후보가 비면 NO_REWARD 기록 (같은 참여 이력으로 재요청 가능)
 ```
 
-- 쿠폰 발급 `requestId = REWARD_{participationId}_{couponTemplateId}`
+- 쿠폰 발급 `requestId = REWARD_{participationNo}_{couponTemplateId}`
   같은 참여 이력을 다시 시도하면 외부 시스템이 기존 결과를 돌려주므로 쿠폰이 중복 발급되지 않습니다.
 - 템플릿 조회(4)와 발급(5) 사이에 한도가 소진될 수 있으므로, 발급이 거절되면 다른 후보로 다시 선정합니다.
 - 예상하지 못한 외부 오류(`REQUEST_ID_CONFLICT` 등)는 500 `COUPON_SYSTEM_ERROR`로 응답하고 트랜잭션을 롤백합니다. 보상 결과는 저장하지 않습니다.
@@ -95,7 +95,7 @@
 |---|---|---|
 | 미션 완료 처리 | `mission` 행 `PESSIMISTIC_WRITE` 락 후 "검사 → 이력 생성" | 전체 100회, 일 10회, 1시간 제한 |
 | 보상 지급 요청 | `mission_participation` 행 `PESSIMISTIC_WRITE` 락 후 "지급 여부 확인 → 지급" | 참여 이력 1건당 1회 지급 |
-| 보상 결과 | `reward.participation_id` UNIQUE | 락이 빠져도 DB에서 한 번 더 막음 |
+| 보상 결과 | `reward.participation_no` UNIQUE | 락이 빠져도 DB에서 한 번 더 막음 |
 | 쿠폰 발급 | 결정적인 `requestId`(멱등 키) | 재시도해도 쿠폰 1개 |
 
 선택하지 않은 방법
@@ -106,7 +106,7 @@
 
 ## 3. 요청값 검증과 코드 규칙 (교정 1)
 
-- **요청값 검증:** 컨트롤러 경로 변수에 Bean Validation 제약(`userId`·`missionId`는 `@NotBlank`, `participationId`는 `@NotNull`·`@Positive`)을 선언했습니다. `userId`·`missionId`에는 형식·길이 제한을 두지 않고, 존재하지 않는 값은 서비스의 존재 여부 확인에서 404로 거절합니다. Spring MVC 내장 메서드 검증이 `HandlerMethodValidationException`을 던지면 전역 핸들러가 제약 종류에 따라 `MISSING_REQUIRED_VALUE` / `INVALID_FORMAT` / `OUT_OF_RANGE`(400)로 바꿉니다. 검증에 실패하면 서비스 로직까지 가지 않습니다.
+- **요청값 검증:** 컨트롤러 경로 변수에 Bean Validation 제약(`userId`·`missionId`는 `@NotBlank`, `participationNo`도 `@NotBlank`)을 선언했습니다. (교정 3 이후 숫자형 경로 변수가 없어 `INVALID_FORMAT`·`OUT_OF_RANGE`는 현재 API에서 발생하지 않습니다.) `userId`·`missionId`에는 형식·길이 제한을 두지 않고, 존재하지 않는 값은 서비스의 존재 여부 확인에서 404로 거절합니다. Spring MVC 내장 메서드 검증이 `HandlerMethodValidationException`을 던지면 전역 핸들러가 제약 종류에 따라 `MISSING_REQUIRED_VALUE` / `INVALID_FORMAT` / `OUT_OF_RANGE`(400)로 바꿉니다. 검증에 실패하면 서비스 로직까지 가지 않습니다.
 - **에러 응답:** 모든 실패 응답은 `code` = 영문 사유 코드(ErrorCode enum 이름), `msg` = 한글 메시지입니다. HTTP 상태 코드는 그대로입니다.
 - **Lombok:** 엔티티는 `@Getter` + `@NoArgsConstructor(access = PROTECTED)`만 씁니다. `@Data`·`@Setter`는 쓰지 않아 상태 변경은 도메인 메서드(`grantPoint`, `markNoReward` 등)로만 합니다.
 - **의존성 주입:** 모든 빈이 `private final` 필드 + `@RequiredArgsConstructor` 생성자 주입을 씁니다.
@@ -119,22 +119,52 @@
 - **로그 접두어:** `[REQ]`/`[RES]`/`[ERR]`(필터), `[EXC]`(전역 예외 처리), `[USER]`/`[MISSION]`/`[REWARD]`/`[COUPON]`(DB 조회·비즈니스 단계). 메시지는 한글로 남깁니다.
 - **운영 로그 강화:** API 요청이 들어온 뒤 DB 조회(사용자 확인, 미션 락, 참여 수 집계, 기존 보상 조회, 보상 아이템 조회, 저장)와 주요 로직(참여 조건 판정, 쿠폰 템플릿 확인·발급, 보상 선택)마다 INFO 로그를 남겨, 운영 로그 파일만으로 요청 하나의 처리 흐름을 따라갈 수 있게 했습니다.
 
-## 5. 외부 쿠폰 시스템 재현
+## 5. 데이터 모델링 및 조회 최적화 (교정 3)
+
+**비즈니스 키**
+
+| 키 | 형식 | 채번 | 제약 |
+|---|---|---|---|
+| 이력번호 `participation_no` | `PT` + 일자(yyyyMMdd) + 일련번호 10자리 (예: `PT202609010000000001`) | DB 시퀀스 `participation_no_seq` | `uk_participation_no` |
+| 리워드번호 `reward_no` | `RW` + 일자 + 일련번호 10자리 | DB 시퀀스 `reward_no_seq` | `uk_reward_no` |
+
+- 일련번호는 DB 시퀀스(`schema.sql`)에서 받습니다. 시퀀스는 동시에 여러 요청이 와도 같은 값을 주지 않으므로 애플리케이션 락 없이 중복 없는 번호를 만들 수 있고, 유니크 제약조건으로 DB에서 한 번 더 막습니다.
+- API·로직·연관은 모두 비즈니스 키 기준입니다. 보상 API 경로 변수, 응답, `reward`→참여 이력 연결(`participation_no`), 쿠폰 발급 requestId가 이력번호를 씁니다. PK는 DB 내부 식별용으로만 남기고 API에 노출하지 않습니다.
+- 리워드번호는 첫 보상 요청 때 채번합니다. `NO_REWARD` 후 재요청하면 같은 리워드번호를 그대로 씁니다.
+- 한계: 시퀀스 값은 롤백돼도 되돌아가지 않아 번호 중간에 빈 값이 생길 수 있습니다. 일자 부분은 채번 시각(KST) 기준입니다.
+
+**JPQL 전환과 인덱스**
+
+| Repository 메서드 (JPQL) | 조건 | 사용 인덱스 (EXPLAIN 확인) |
+|---|---|---|
+| `countByMission` | mission_id | `idx_participation_mission_user_datetime` (선두 컬럼) |
+| `countDailyByUser` | mission_id, user_id, participated_date | `idx_participation_mission_user_datetime` |
+| `findRecentByUser` (+`findLatestByUser`, 1건) | mission_id, user_id, 일자·시간 역순 | `idx_participation_mission_user_datetime` |
+| `findByParticipationNo(ForUpdate)` | participation_no | `uk_participation_no` |
+| `RewardRepository.findByParticipationNo` | participation_no | `uk_reward_participation_no` |
+| `MissionItemRepository.findByMission` | mission_id, **정렬 없음** | `idx_mission_item_mission` |
+| `MissionRepository.findEntryPeriodMissions` | entry_start_date ≤ 오늘 ≤ entry_end_date | `idx_mission_entry_period` |
+
+- 전체 미션 조회(`findAllByOrderByMissionIdAsc`)는 오늘 참여 기간에 걸친 미션만 일자 조건으로 먼저 거르고, 시·분·초 단위의 정확한 기간 판단은 참여 정책에서 합니다.
+- 보상 아이템 조회는 무작위 선택에 순서가 필요 없어 정렬을 뺐습니다. 무작위 선택은 인덱스가 아니라 아이템 자체를 고르도록(`RewardRandomizer.pick`) 바꿨습니다.
+- 직전 참여 조회는 PK 역순 조건을 뺐습니다. 같은 사용자·미션은 1시간 안에 다시 참여할 수 없어 일자·시간만으로 순서가 정해집니다.
+
+## 6. 외부 쿠폰 시스템 재현
 
 - `CouponClient` 인터페이스가 과제 8절 계약(8.1 템플릿 조회, 8.2 발급, 8.3 발급 결과 조회)을 그대로 표현합니다.
 - `FakeCouponSystem`은 계약의 모든 결과를 재현합니다. 성공, 404, 한도 소진, 유효하지 않은 템플릿(미존재·발급 중지), 동일 requestId 멱등, 동일 requestId에 다른 내용이면 거부.
 - 외부 시스템 한 대를 흉내 내므로 상태 변경 메서드를 `synchronized`로 원자 처리했습니다.
 - 실제 연동할 때는 HTTP 구현체로 `CouponClient`만 교체하면 됩니다.
 
-## 6. 중요 문제와 우선순위 (과제 12·14절)
+## 7. 중요 문제와 우선순위 (과제 12·14절)
 
 > 이번 작업 범위(최초 프롬프트)에서는 과제 12·14절 "추가로 발견한 문제" 선정과 작성을 제외했습니다. 후속 작업에서 작성할 예정입니다.
 >
 > 참고로 2.3절의 동시성 제어와 쿠폰 멱등 처리는 과제 5절(반복·동시 요청)과 7절(참여 이력당 보상 1회) 정책을 지키기 위한 **기본 구현 범위**로 보고 구현했습니다.
 
-## 7. 검증 방법
+## 8. 검증 방법
 
-- JUnit5 자동화 테스트 88개 (단위 24 / 통합 31 / API 27 / 설정 6)
+- JUnit5 자동화 테스트 102개 (단위 24 / 통합 44 / API 28 / 설정 6)
   - 단위: 참여 정책 경계값, KST 변환, 쿠폰 재현체 계약
   - 통합: 실제 H2·트랜잭션·락을 쓰는 미션/보상 시나리오, 시간 경과(MutableClock)
   - 동시성: 스레드 여러 개로 동시 요청 → 결과 건수 검증
@@ -142,7 +172,7 @@
 - QA 항목과 테스트 매핑: `test-or-verification/QA_LIST.md`
 - 실행 결과: `test-or-verification/TEST_RESULT.md`
 
-## 8. 현재 구현의 한계와 추가 개선
+## 9. 현재 구현의 한계와 추가 개선
 
 - 같은 미션에 대한 완료 처리가 미션 행 락으로 직렬 처리되어, 참여가 몰리는 미션에서는 처리량이 제한됩니다.
 - 외부 쿠폰 호출이 DB 트랜잭션 안에서 이뤄져, 외부 응답이 지연되면 락 점유 시간이 길어집니다. (개선 방향: 보상 상태를 PENDING으로 먼저 커밋한 뒤 트랜잭션 밖에서 발급하고 결과를 반영)
