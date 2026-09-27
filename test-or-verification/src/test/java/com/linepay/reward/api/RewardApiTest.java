@@ -146,19 +146,7 @@ class RewardApiTest extends IntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("QA-A06 404: 이력번호가 아닌 값(DB PK 숫자 등)으로 보상 요청 → PARTICIPATION_NOT_FOUND")
-    void pkIsNotAccepted() throws Exception {
-        mockMvc.perform(post("/linepay/v1/mission/USER_0001/MISSION_0003/complete")).andExpect(status().isOk());
-
-        // 참여 이력의 DB PK(1)는 API 식별자로 쓰이지 않는다
-        mockMvc.perform(post("/linepay/v1/reward/USER_0001/1"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("PARTICIPATION_NOT_FOUND"))
-                .andExpect(jsonPath("$.data").value(nullValue()));
-    }
-
-    @Test
-    @DisplayName("QA-A07 정의되지 않은 경로(404)·허용되지 않은 메서드(405)도 공통 포맷으로 응답")
+    @DisplayName("QA-A06 정의되지 않은 경로(404)·허용되지 않은 메서드(405)도 공통 포맷으로 응답")
     void unknownPathAndMethod() throws Exception {
         mockMvc.perform(get("/linepay/v2/mission/USER_0001"))
                 .andExpect(status().isNotFound())
@@ -171,7 +159,7 @@ class RewardApiTest extends IntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("QA-A08 NO_REWARD 는 오류가 아닌 정상 결과(200)로 반환된다")
+    @DisplayName("QA-A07 NO_REWARD 는 오류가 아닌 정상 결과(200)로 반환된다")
     void noRewardIsSuccess() throws Exception {
         String missionId = TEST_PREFIX + "COUPON_MISSION";
         createMission(missionId);

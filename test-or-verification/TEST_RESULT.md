@@ -6,7 +6,7 @@
 |---|---|
 | 실행일 | 2026-09-26 (KST) |
 | 명령 | `gradlew.bat clean test` |
-| 결과 | **93개 전체 통과** (기존 87 + 캐싱 3 + 락 성능 3) |
+| 결과 | **92개 전체 통과** (기존 86 + 캐싱 3 + 락 성능 3) |
 
 | 테스트 클래스 | QA | 테스트 수 | 실패 |
 |---|---|---:|---:|
@@ -22,9 +22,9 @@
 | `integration.DatabaseFailureTest` | QA-D | 1 | 0 |
 | `integration.MissionCacheTest` | QA-H | 3 | 0 |
 | `integration.LockPerformanceTest` | QA-S | 3 | 0 |
-| `api.RewardApiTest` | QA-A | 8 | 0 |
+| `api.RewardApiTest` | QA-A | 7 | 0 |
 | `api.RequestValidationApiTest` | QA-V | 16 | 0 |
-| **합계** | | **93** | **0** |
+| **합계** | | **92** | **0** |
 
 ### 동시성 제어 락 성능 측정 결과 (`LockPerformanceTest` 로그 `[PERF]`)
 

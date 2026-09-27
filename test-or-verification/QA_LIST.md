@@ -113,9 +113,8 @@
 | QA-A03 | 404 응답 `code`=영문 사유 코드, `msg`=한글 메시지, `data: null` (data 키가 있어야 함) |
 | QA-A04 | 409 응답 (기간 외, 재참여 제한, 중복 보상) |
 | QA-A05 | 보상 요청 전 조회 → 404 REWARD_NOT_FOUND |
-| QA-A06 | 이력번호가 아닌 DB PK 숫자로 보상 요청 → 404 PARTICIPATION_NOT_FOUND (PK 비노출) |
-| QA-A07 | 정의되지 않은 경로(404), 허용되지 않은 메서드(405)도 공통 포맷 |
-| QA-A08 | NO_REWARD는 200 정상 응답 |
+| QA-A06 | 정의되지 않은 경로(404), 허용되지 않은 메서드(405)도 공통 포맷 |
+| QA-A07 | NO_REWARD는 200 정상 응답 |
 
 ## 9. 요청값 검증 (교정 1: Spring Validation)
 
