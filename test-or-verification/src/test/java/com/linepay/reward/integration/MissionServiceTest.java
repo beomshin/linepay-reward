@@ -173,4 +173,17 @@ class MissionServiceTest extends IntegrationTestSupport {
         clock.setKst(LocalDateTime.of(2026, 5, 1, 0, 0, 0));
         assertThat(availableMissionIds("USER_0001")).containsExactly("MISSION_0002", "MISSION_0003");
     }
+
+    @Test
+    @DisplayName("QA-M13 참여 기간 초과: 종료 시각(2027-01-01 00:00:00)의 완료 요청은 MISSION_NOT_IN_PERIOD, 1초 전은 성공")
+    void completeAfterEntryPeriod() {
+        clock.setKst(LocalDateTime.of(2027, 1, 1, 0, 0, 0));
+        assertThat(errorOf(() -> missionService.completeMission("USER_0001", "MISSION_0003")))
+                .isEqualTo(ErrorCode.MISSION_NOT_IN_PERIOD);
+        assertThat(participationRepository.count()).isZero();
+
+        clock.setKst(LocalDateTime.of(2026, 12, 31, 23, 59, 59));
+        missionService.completeMission("USER_0001", "MISSION_0003");
+        assertThat(participationRepository.count()).isEqualTo(1);
+    }
 }

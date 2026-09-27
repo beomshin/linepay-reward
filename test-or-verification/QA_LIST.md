@@ -15,7 +15,7 @@
 | QA-A | `api/RewardApiTest` | API (MockMvc) |
 | QA-V | `api/RequestValidationApiTest` | API (MockMvc, 요청값 검증) |
 | QA-K | `integration/BusinessKeyTest` | 통합 (비즈니스 키 채번, 유니크 제약) |
-| QA-D | `integration/FailureScenarioTest`, `integration/DatabaseFailureTest` | 통합 + API (애플리케이션·DB 장애, 참여 기간 초과) |
+| QA-D | `integration/FailureScenarioTest`, `integration/DatabaseFailureTest` | 통합 + API (애플리케이션·DB 장애) |
 | QA-H | `integration/MissionCacheTest` | 통합 (일자별 미션 조회 캐싱) |
 | QA-S | `integration/LockPerformanceTest` | 통합 (동시성 제어 락 성능 측정) |
 
@@ -69,6 +69,7 @@
 | QA-M10 | 전체 100회 도달 → 모든 사용자 참여 불가, 목록에서 빠짐 |
 | QA-M11 | 거절된 요청은 참여 횟수에 들어가지 않음 |
 | QA-M12 | 기간 시작 전 미션은 목록에 없고, 시작 시각부터 조회 |
+| QA-M13 | 참여 기간 초과: 종료 시각(2027-01-01 00:00:00) 완료 요청 → MISSION_NOT_IN_PERIOD, 이력 없음. 1초 전(23:59:59)은 성공 |
 
 ## 5. 보상 지급·조회 (과제 7절)
 
@@ -150,10 +151,9 @@
 | ID | 구분 | 검증 항목 |
 |---|---|---|
 | QA-D01 | 애플리케이션 시스템 이슈 | 처리 중 예상하지 못한 예외 → 500 INTERNAL_SERVER_ERROR(한글 메시지, data=null), 참여 이력 생성 안 됨 |
-| QA-D02 | 참여 기간 초과 | 종료 시각(2027-01-01 00:00:00) 완료 요청 → 409 MISSION_NOT_IN_PERIOD, 이력 없음. 1초 전(23:59:59)은 성공 |
-| QA-D03 | DB 시스템 이슈 | DB 연결 실패 → 503 DATABASE_ERROR(한글 메시지), 참여 이력 생성 안 됨 |
+| QA-D02 | DB 시스템 이슈 | DB 연결 실패 → 503 DATABASE_ERROR(한글 메시지), 참여 이력 생성 안 됨 |
 
-쿠폰 통신 오류·보상 처리 실패 테스트는 6절(QA-F03~F06)에 있습니다.
+쿠폰 통신 오류·보상 처리 실패 테스트는 6절(QA-F03~F06), 참여 기간 초과 테스트는 4절(QA-M13)에 있습니다.
 
 ## 12. 일자별 미션 조회 캐싱 (교정 5)
 

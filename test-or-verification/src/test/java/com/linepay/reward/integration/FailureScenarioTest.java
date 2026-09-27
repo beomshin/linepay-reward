@@ -9,8 +9,6 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.LocalDateTime;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -21,8 +19,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * 실패·장애 상황 테스트 (교정 4)
- * - 애플리케이션 시스템 이슈, 참여 기간 초과
- * - DB 시스템 이슈는 {@link DatabaseFailureTest}, 쿠폰 시스템 호출 실패는 {@link CouponFailureTest}
+ * - 애플리케이션 시스템 이슈
+ * - DB 시스템 이슈는 {@link DatabaseFailureTest}, 쿠폰 시스템 호출 실패는 {@link CouponFailureTest},
+ *   참여 기간 초과는 {@link MissionServiceTest}
  */
 @AutoConfigureMockMvc
 @DisplayName("[QA-D] 실패·장애 상황")
@@ -45,22 +44,5 @@ class FailureScenarioTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data").value(nullValue()));
 
         assertThat(participationRepository.count()).isZero();
-    }
-
-    @Test
-    @DisplayName("QA-D02 참여 기간 초과: 종료 시각(2027-01-01 00:00:00)의 완료 요청 → 409 MISSION_NOT_IN_PERIOD, 1초 전은 성공")
-    void completeAfterEntryPeriod() throws Exception {
-        clock.setKst(LocalDateTime.of(2027, 1, 1, 0, 0, 0));
-        mockMvc.perform(post("/linepay/v1/mission/USER_0001/MISSION_0003/complete"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("MISSION_NOT_IN_PERIOD"))
-                .andExpect(jsonPath("$.msg").value("미션 참여 가능 기간이 아닙니다."))
-                .andExpect(jsonPath("$.data").value(nullValue()));
-        assertThat(participationRepository.count()).isZero();
-
-        clock.setKst(LocalDateTime.of(2026, 12, 31, 23, 59, 59));
-        mockMvc.perform(post("/linepay/v1/mission/USER_0001/MISSION_0003/complete"))
-                .andExpect(status().isOk());
-        assertThat(participationRepository.count()).isEqualTo(1);
     }
 }
