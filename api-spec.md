@@ -8,7 +8,7 @@
 | 버전 | `v1` |
 | Content-Type | `application/json; charset=UTF-8` |
 | 메서드 | 조회 `GET`, 미션 완료 처리·보상 지급 요청 `POST` |
-| 사용자 식별 | PathVariable `{userId}` (인증 없음, 과제 11절) |
+| 사용자 식별 | PathVariable `{userId}` |
 | 시간 표기 | KST 기준, 일자 `yyyyMMdd` / 시간 `HHmmss` 필드 분리 |
 | 식별 번호 | 참여 이력은 이력번호 `participationNo`(`PT`+일자 8자리+일련번호 10자리), 보상 결과는 리워드번호 `rewardNo`(`RW`+일자+일련번호)로 식별. DB PK는 API에 노출하지 않음 |
 | 요청 추적 | 모든 응답 헤더에 `X-Trace-Id`(요청별 traceId, 32자리) 포함. 서버 로그의 `[traceId]`와 같은 값 |
@@ -59,7 +59,7 @@
 조회 시점에 해당 사용자가 **실제로 참여할 수 있는** 미션만 반환합니다.
 (참여 기간 내, 미션 전체 100회 미만, 사용자 당일 10회 미만, 직전 참여 후 1시간 경과)
 
-> 교정 5: 오늘 참여 기간에 걸친 미션 목록은 일자별로 캐싱합니다(TTL 10분, 미션 데이터 변경은 캐시 만료 후 반영). 참여 횟수·재참여 조건은 요청마다 DB에서 확인하므로 응답 내용은 캐싱 전과 같습니다.
+> 오늘 참여 기간에 걸친 미션 목록은 일자별로 캐싱합니다(TTL 10분, 미션 데이터 변경은 캐시 만료 후 반영). 참여 횟수·재참여 조건은 요청마다 DB에서 확인하므로 응답 내용은 캐싱 전과 같습니다.
 
 **Response 200**
 ```json
@@ -221,7 +221,7 @@
 | 400 | MISSING_REQUIRED_VALUE | 필수 요청값이 누락되었습니다. (userId) | `userId`가 공백 |
 | 400 | MISSING_REQUIRED_VALUE | 필수 요청값이 누락되었습니다. (participationNo) | `participationNo`가 공백 |
 | 404 | USER_NOT_FOUND | 사용자를 찾을 수 없습니다. | 존재하지 않는 사용자 |
-| 404 | PARTICIPATION_NOT_FOUND | 미션 참여 이력을 찾을 수 없습니다. | 이력번호가 없거나 요청 사용자의 이력이 아님 (DB PK 숫자로는 조회되지 않음) |
+| 404 | PARTICIPATION_NOT_FOUND | 미션 참여 이력을 찾을 수 없습니다. | 이력번호가 없거나 요청 사용자의 이력이 아님 |
 | 409 | REWARD_ALREADY_GRANTED | 이미 보상이 지급된 미션 참여입니다. | 이미 보상이 지급된 참여 이력 |
 | 500 | COUPON_SYSTEM_ERROR | 쿠폰 발급 처리 중 오류가 발생했습니다. | 쿠폰 시스템이 예상하지 못한 결과를 반환하거나 호출 중 그 외 예외 발생 (보상 결과는 `FAILED`로 저장) |
 | 503 | COUPON_COMMUNICATION_FAILED | 쿠폰 시스템과 통신하지 못해 보상을 지급하지 못했습니다. 잠시 후 다시 요청해 주세요. | 쿠폰 시스템 IO 오류·타임아웃 (보상 결과는 `FAILED`로 저장) |
@@ -271,7 +271,7 @@
 
 ## 4. 외부 쿠폰 시스템 (재현)
 
-실제 HTTP 서버는 만들지 않았고, 계약(과제 8절)을 `CouponClient` 인터페이스로 정의한 뒤 In-memory 구현 `FakeCouponSystem`이 동작을 재현합니다.
+실제 HTTP 서버는 만들지 않았고, 계약 `CouponClient` 인터페이스로 정의한 뒤 In-memory 구현 `FakeCouponSystem`이 동작을 재현합니다.
 
 | 계약 | 재현 메서드 | 실패 결과 |
 |---|---|---|
