@@ -127,6 +127,10 @@ class ConcurrencyTest extends IntegrationTestSupport {
     @Test
     @DisplayName("QA-X04 한도 5개 쿠폰에 10건의 보상 요청이 동시에 몰려도 쿠폰은 5개만 발급된다")
     void couponQuotaUnderConcurrency() throws Exception {
+        /**
+         * 쿠폰 발급만 가능한 미션 생성
+         * 쿠폰 발급 한도 5개 설정 후 테스트
+         */
         couponSystem.registerTemplate("TEST_TEMPLATE_FIVE", "5개 한정", 5, 0, CouponTemplateStatus.AVAILABLE);
         String missionId = TEST_PREFIX + "COUPON_MISSION";
         createMission(missionId);

@@ -74,8 +74,8 @@ class BusinessKeyTest extends IntegrationTestSupport {
 
         List<String> numbers = runConcurrently(tasks);
 
-        assertThat(new HashSet<>(numbers)).hasSize(300);
-        assertThat(numbers).allMatch(n -> n.matches("(PT|RW)20260901\\d{10}"));
+        assertThat(new HashSet<>(numbers)).hasSize(300); // 중복제거 검증
+        assertThat(numbers).allMatch(n -> n.matches("(PT|RW)20260901\\d{10}")); // 형식 검증
     }
 
     @Test
@@ -90,7 +90,7 @@ class BusinessKeyTest extends IntegrationTestSupport {
 
         List<String> numbers = runConcurrently(tasks);
 
-        assertThat(new HashSet<>(numbers)).hasSize(100);
+        assertThat(new HashSet<>(numbers)).hasSize(100); // 중복제거 검증
         Set<String> stored = new HashSet<>();
         participationRepository.findAll().forEach(p -> stored.add(p.getParticipationNo()));
         assertThat(stored).hasSize(100).containsExactlyInAnyOrderElementsOf(numbers);
