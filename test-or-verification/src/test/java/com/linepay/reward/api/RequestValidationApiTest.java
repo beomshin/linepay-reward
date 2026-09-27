@@ -52,10 +52,6 @@ class RequestValidationApiTest extends IntegrationTestSupport {
         assertThat(participationRepository.count()).isZero();
     }
 
-    /*
-     * userId·missionId 는 @NotBlank(필수값)만 검증한다. 형식(@Pattern)·길이(@Size) 제한은 두지 않으므로
-     * 특수문자·한글·긴 값은 요청값 검증을 통과하고, 서비스의 존재 여부 확인에서 404 로 거절된다.
-     */
     @ParameterizedTest
     @ValueSource(strings = {"USER-0001", "USER 0001", "유저0001", "USER@0001", "USER.0001"})
     @DisplayName("QA-V03 형식 제한 없음: 특수문자·한글이 포함된 userId → 검증 통과 후 404 USER_NOT_FOUND")
@@ -86,10 +82,6 @@ class RequestValidationApiTest extends IntegrationTestSupport {
         assertThat(participationRepository.count()).isZero();
     }
 
-    /*
-     * 교정 3: 보상 API 는 DB PK(participationId, 숫자) 대신 이력번호(participationNo, 문자열)를 받는다.
-     * 이력번호는 필수값(@NotBlank)만 검증하고, 없는 번호는 서비스에서 404 로 거절한다.
-     */
     @Test
     @DisplayName("QA-V06 필수값 누락: 공백 participationNo → 400 MISSING_REQUIRED_VALUE (보상 요청·조회)")
     void blankParticipationNo() throws Exception {
@@ -131,4 +123,5 @@ class RequestValidationApiTest extends IntegrationTestSupport {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("USER_NOT_FOUND"));
     }
+
 }
