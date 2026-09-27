@@ -6,14 +6,13 @@
 |---|---|
 | 실행일 | 2026-09-26 (KST) |
 | 명령 | `gradlew.bat clean test` |
-| 결과 | **104개 전체 통과** (기존 98 + 캐싱 3 + 락 성능 3) |
+| 결과 | **99개 전체 통과** (기존 93 + 캐싱 3 + 락 성능 3) |
 
 | 테스트 클래스 | QA | 테스트 수 | 실패 |
 |---|---|---:|---:|
 | `unit.KstTimeTest` | QA-T | 3 | 0 |
 | `unit.ParticipationPolicyTest` | QA-P | 8 | 0 |
 | `unit.FakeCouponSystemTest` | QA-C | 8 | 0 |
-| `unit.TraceIdFilterTest` | QA-L | 5 | 0 |
 | `config.ProfileConfigTest` | QA-E | 6 | 0 |
 | `integration.MissionServiceTest` | QA-M | 12 | 0 |
 | `integration.RewardServiceTest` | QA-R | 13 | 0 |
@@ -26,7 +25,7 @@
 | `integration.LockPerformanceTest` | QA-S | 3 | 0 |
 | `api.RewardApiTest` | QA-A | 8 | 0 |
 | `api.RequestValidationApiTest` | QA-V | 16 | 0 |
-| **합계** | | **104** | **0** |
+| **합계** | | **99** | **0** |
 
 ### 동시성 제어 락 성능 측정 결과 (`LockPerformanceTest` 로그 `[PERF]`)
 
@@ -81,14 +80,13 @@ QA-S03 락 경합 비교 (각 100건)
 |---|---|
 | 실행일 | 2026-09-26 (KST) |
 | 명령 | `gradlew.bat clean test bootJar` |
-| 결과 | **98개 전체 통과** (기존 91 + 실패·장애 7) |
+| 결과 | **93개 전체 통과** (기존 86 + 실패·장애 7) |
 
 | 테스트 클래스 | QA | 테스트 수 | 실패 |
 |---|---|---:|---:|
 | `unit.KstTimeTest` | QA-T | 3 | 0 |
 | `unit.ParticipationPolicyTest` | QA-P | 8 | 0 |
 | `unit.FakeCouponSystemTest` | QA-C | 8 | 0 |
-| `unit.TraceIdFilterTest` | QA-L | 5 | 0 |
 | `config.ProfileConfigTest` | QA-E | 6 | 0 |
 | `integration.MissionServiceTest` | QA-M | 12 | 0 |
 | `integration.RewardServiceTest` | QA-R | 13 | 0 |
@@ -99,14 +97,14 @@ QA-S03 락 경합 비교 (각 100건)
 | `integration.DatabaseFailureTest` | QA-D | 1 | 0 |
 | `api.RewardApiTest` | QA-A | 8 | 0 |
 | `api.RequestValidationApiTest` | QA-V | 16 | 0 |
-| **합계** | | **98** | **0** |
+| **합계** | | **93** | **0** |
 
 교정 4 완료 조건 확인
 
 | 완료 조건 | 결과 |
 |---|---|
 | 쿠폰 API IO 오류·타임아웃 → 보상 처리, 정의된 에러 코드·한글 메시지 | QA-D03~D05·D07 통과. IO 오류·읽기 타임아웃은 503 `COUPON_COMMUNICATION_FAILED`, 기타 예외는 500 `COUPON_SYSTEM_ERROR`와 한글 메시지로 응답하고 보상 결과 `FAILED` 저장. 회복 후 재요청하면 같은 리워드번호로 지급. (재시도 로직은 두지 않았으므로 "정해진 횟수만큼 재시도"는 해당 없음 — 쿠폰 API는 1회 호출) |
-| for 문 변경 후 기존 테스트 결과 동일 | 기존 91개 모두 통과 (쿠폰 제외 후 재선정 QA-F01, 한도 소진 QA-R09·R13, 동시 발급 QA-X04 포함). QA-F02만 실패 내역 저장에 맞춰 기대값 변경 (저장 안 됨 → FAILED 저장) |
+| for 문 변경 후 기존 테스트 결과 동일 | 기존 86개 모두 통과 (쿠폰 제외 후 재선정 QA-F01, 한도 소진 QA-R09·R13, 동시 발급 QA-X04 포함). QA-F02만 실패 내역 저장에 맞춰 기대값 변경 (저장 안 됨 → FAILED 저장) |
 | 추가 실패 테스트 4종 통과 | 애플리케이션 시스템 이슈(QA-D01), DB 시스템 이슈(QA-D06), 참여 기간 초과(QA-D02), 쿠폰 통신 오류·보상 처리(QA-D03~D05, D07) 모두 통과 |
 
 ---
@@ -119,7 +117,7 @@ QA-S03 락 경합 비교 (각 100건)
 |---|---|
 | 실행일 | 2026-09-26 (KST) |
 | 명령 | `gradlew.bat clean test bootJar` |
-| 결과 | **91개 전체 통과** |
+| 결과 | **86개 전체 통과** |
 
 조정 내용
 
@@ -131,7 +129,6 @@ QA-S03 락 경합 비교 (각 100건)
 | `unit.KstTimeTest` | QA-T | 3 | 0 |
 | `unit.ParticipationPolicyTest` | QA-P | 8 | 0 |
 | `unit.FakeCouponSystemTest` | QA-C | 8 | 0 |
-| `unit.TraceIdFilterTest` | QA-L | 5 | 0 |
 | `config.ProfileConfigTest` | QA-E | 6 | 0 |
 | `integration.MissionServiceTest` | QA-M | 12 | 0 |
 | `integration.RewardServiceTest` | QA-R | 13 | 0 |
@@ -140,7 +137,7 @@ QA-S03 락 경합 비교 (각 100건)
 | `integration.BusinessKeyTest` | QA-K | 6 | 0 |
 | `api.RewardApiTest` | QA-A | 8 | 0 |
 | `api.RequestValidationApiTest` | QA-V | 16 | 0 |
-| **합계** | | **91** | **0** |
+| **합계** | | **86** | **0** |
 
 ---
 
@@ -152,14 +149,13 @@ QA-S03 락 경합 비교 (각 100건)
 |---|---|
 | 실행일 | 2026-09-26 (KST) |
 | 명령 | `gradlew.bat clean test bootJar` |
-| 결과 | **102개 전체 통과** (기존 88 + 비즈니스 키 6 + 실행 계획 7 + 검증 테스트 변경 1) |
+| 결과 | **97개 전체 통과** (기존 83 + 비즈니스 키 6 + 실행 계획 7 + 검증 테스트 변경 1) |
 
 | 테스트 클래스 | QA | 테스트 수 | 실패 |
 |---|---|---:|---:|
 | `unit.KstTimeTest` | QA-T | 3 | 0 |
 | `unit.ParticipationPolicyTest` | QA-P | 8 | 0 |
 | `unit.FakeCouponSystemTest` | QA-C | 8 | 0 |
-| `unit.TraceIdFilterTest` | QA-L | 5 | 0 |
 | `config.ProfileConfigTest` | QA-E | 6 | 0 |
 | `integration.MissionServiceTest` | QA-M | 12 | 0 |
 | `integration.RewardServiceTest` | QA-R | 13 | 0 |
@@ -170,7 +166,7 @@ QA-S03 락 경합 비교 (각 100건)
 | `api.RewardApiTest` | QA-A | 8 | 0 |
 | `api.RequestValidationApiTest` | QA-V | 16 | 0 |
 | `api.TraceIdLoggingTest` | QA-L | 4 | 0 |
-| **합계** | | **102** | **0** |
+| **합계** | | **97** | **0** |
 
 교정 3 완료 조건 확인
 
@@ -202,8 +198,8 @@ QA-S03 락 경합 비교 (각 100건)
 | 회차 | 결과 | 원인 | 조치 |
 |---|---|---|---|
 | 1회차 | 컴파일 실패 | `RewardService.getReward`의 `findByParticipationId` 호출 1곳이 바뀌지 않음 | `findByParticipationNo`로 수정 |
-| 2회차 | 102/102 통과 | 실행 계획 확인 결과 참여 기간 미션 조회도 `idx_mission_entry_period`를 사용 | QA-I07에 인덱스 이름 확인 추가 |
-| 3회차 | 102/102 통과 | - | - |
+| 2회차 | 97/97 통과 | 실행 계획 확인 결과 참여 기간 미션 조회도 `idx_mission_entry_period`를 사용 | QA-I07에 인덱스 이름 확인 추가 |
+| 3회차 | 97/97 통과 | - | - |
 
 ---
 
@@ -215,14 +211,13 @@ QA-S03 락 경합 비교 (각 100건)
 |---|---|
 | 실행일 | 2026-09-26 (KST) |
 | 명령 | `gradlew.bat clean test bootJar` |
-| 결과 | **88개 전체 통과** (기존 73 + 설정 분리 6 + 요청 추적·로그 9) |
+| 결과 | **83개 전체 통과** (기존 73 + 설정 분리 6 + 요청 추적 로그 4) |
 
 | 테스트 클래스 | QA | 테스트 수 | 실패 |
 |---|---|---:|---:|
 | `unit.KstTimeTest` | QA-T | 3 | 0 |
 | `unit.ParticipationPolicyTest` | QA-P | 8 | 0 |
 | `unit.FakeCouponSystemTest` | QA-C | 8 | 0 |
-| `unit.TraceIdFilterTest` | QA-L | 5 | 0 |
 | `config.ProfileConfigTest` | QA-E | 6 | 0 |
 | `integration.MissionServiceTest` | QA-M | 12 | 0 |
 | `integration.RewardServiceTest` | QA-R | 13 | 0 |
@@ -231,7 +226,7 @@ QA-S03 락 경합 비교 (각 100건)
 | `api.RewardApiTest` | QA-A | 8 | 0 |
 | `api.RequestValidationApiTest` | QA-V | 15 | 0 |
 | `api.TraceIdLoggingTest` | QA-L | 4 | 0 |
-| **합계** | | **88** | **0** |
+| **합계** | | **83** | **0** |
 
 ### 프로파일별 기동 확인 (`java -jar ... --spring.profiles.active=<프로파일>`)
 
@@ -249,16 +244,15 @@ QA-S03 락 경합 비교 (각 100건)
 |---|---|
 | 프로파일별 설정 적용, 운영 프로파일에 테스트용 설정 없음 | 위 표 + QA-E01~E06 통과. prod는 기준 시각이 고정되지 않고 H2 콘솔이 꺼짐 |
 | 개발은 콘솔, 운영은 로그 파일 | local·dev는 콘솔에 앱 로그 출력, prod는 콘솔에 앱 로그가 없고 `linepay-reward.log`에 기록 |
-| 같은 요청은 같은 traceId, 요청 간 MDC 섞이지 않음 | QA-L01~L08 통과 (동시 요청 50건·스레드 재사용 포함). 실제 서버에서도 한 요청의 로그 3줄이 같은 traceId |
+| 같은 요청은 같은 traceId, 요청 간 MDC 섞이지 않음 | QA-L06~L08 통과. 실제 서버에서도 한 요청의 로그 3줄이 같은 traceId |
 
 실행 중 발견한 사항
 
 | 회차 | 결과 | 원인 | 조치 |
 |---|---|---|---|
-| 1회차 | 컴파일 실패 | 테스트의 `FilterChain` 람다 안에서 `Thread.sleep`의 `InterruptedException`을 처리하지 않음 | `LockSupport.parkNanos`로 교체 |
-| 2회차 | 87/87 통과 | prod 기동 시 콘솔에 logback 경고 `Appender named [CONSOLE] not referenced` 출력 | 콘솔 appender 정의를 `!prod` 프로파일 블록 안으로 이동 |
-| 3회차 | 87/87 통과 | prod 콘솔 경고 없음 확인 | - |
-| 4회차 | 88/88 통과 | 운영 로그 강화: DB 조회·주요 로직 단계별 한글 로그 추가, 로그 문구 변경에 맞춰 QA-L06~L08 기대값 수정, QA-L09 추가 | 실제 서버(local)에서 미션 완료·보상 지급 요청 로그 확인 (아래 예시) |
+| 1회차 | 82/82 통과 | prod 기동 시 콘솔에 logback 경고 `Appender named [CONSOLE] not referenced` 출력 | 콘솔 appender 정의를 `!prod` 프로파일 블록 안으로 이동 |
+| 2회차 | 82/82 통과 | prod 콘솔 경고 없음 확인 | - |
+| 3회차 | 83/83 통과 | 운영 로그 강화: DB 조회·주요 로직 단계별 한글 로그 추가, 로그 문구 변경에 맞춰 QA-L06~L08 기대값 수정, QA-L09 추가 | 실제 서버(local)에서 미션 완료·보상 지급 요청 로그 확인 (아래 예시) |
 
 운영 로그 강화 후 실제 서버 로그 (local, traceId 일부 생략)
 

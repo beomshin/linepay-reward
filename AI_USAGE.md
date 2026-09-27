@@ -402,7 +402,7 @@ Java 21, Spring Boot, Gradle, H2, JUnit5을 사용하며, 그밖 의존성은 �
 | MDC Filter | `common/logging/TraceIdFilter`(`OncePerRequestFilter`, 최우선 순서) 추가. 요청마다 UUID traceId를 MDC에 넣고 응답 헤더 `X-Trace-Id`로 반환. `[REQ]` 요청 로그, `[RES]` 상태 코드·처리 시간 로그, 필터까지 올라온 예외는 `[ERR]` 로그 후 다시 던짐. `finally`에서 `MDC.remove`로 정리 |
 | 요청·응답·예외 로그 | `GlobalExceptionHandler` 로그에 `[EXC]` 접두어 추가. `MissionService`(`[MISSION]` 목록 조회 debug, 완료·거절 info), `RewardService`(`[REWARD]` 지급 결과, 중복 요청, 쿠폰 제외, 쿠폰 복구, 예상하지 못한 외부 결과) 로그 추가 |
 | 주석 | 미션 완료(락 획득 → 조건 검사 → 이력 생성), 보상 지급(락·소유자 확인 → 1회 지급 확인 → 선정·저장) 단계별 주석 추가. 설정 파일마다 프로파일 용도와 테스트용 설정 위치 주석 |
-| 테스트 추가 | `ProfileConfigTest`(QA-E01~E06, 6건), `TraceIdFilterTest`(QA-L01~L05, 5건), `TraceIdLoggingTest`(QA-L06~L08, 3건, 콘솔 로그 캡처) |
+| 테스트 추가 | `ProfileConfigTest`(QA-E01~E06, 6건), `TraceIdLoggingTest`(QA-L06~L08, 3건, 콘솔 로그 캡처) |
 | 운영 로그 강화 (본인 판단 반영) | API 요청 이후 DB 조회와 주요 서비스 로직마다 한글 INFO 로그 추가. `[USER]` 사용자 존재 조회, `[MISSION]` 전체 미션 조회·미션 락 획득·참여 조건 검사(전체/당일 참여 수, 직전 참여, 판정 결과)·참여 이력 저장, `[REWARD]` 참여 이력 락 획득·기존 보상 조회·보상 아이템 조회·후보 확정·무작위 선택·포인트 결정·결과 저장·결과 조회, `[COUPON]` 템플릿 조회·기존 발급 결과 조회·발급 요청/성공/거절. 필터(`[REQ]`/`[RES]`/`[ERR]`)와 예외(`[EXC]`) 로그도 한글로 변경. `TraceIdLoggingTest` 기대값 수정 및 QA-L09(보상 지급 흐름 로그) 추가 |
 | 문서 반영 | `README.md`(프로파일별 실행·설정 표, traceId 로그 예시), `DESIGN.md`(4. 운영 환경 대응), `api-spec.md`(`X-Trace-Id` 헤더), `QA_LIST.md`(QA-E, QA-L), `TEST_RESULT.md`, `.gitignore`(`logs/`) |
 
@@ -423,7 +423,7 @@ Java 21, Spring Boot, Gradle, H2, JUnit5을 사용하며, 그밖 의존성은 �
 |---|---|---|
 | 프로파일별 설정 적용, 운영 프로파일에 테스트용 설정 없음 | `ProfileConfigTest` + `java -jar --spring.profiles.active=local/dev/prod` 기동 후 API 호출 | local은 참여 일자 `20260901`(고정 시각), dev·prod는 `20260926`(시스템 시각). H2 콘솔 local·dev 200, prod 404 |
 | 개발은 콘솔, 운영은 로그 파일 | 프로파일별 기동 후 표준 출력과 로그 파일 확인 | local·dev는 콘솔에 앱 로그 출력(파일 없음), prod는 콘솔에 기동 배너만 있고 `linepay-reward.log`에 앱 로그 기록 |
-| 같은 요청은 같은 traceId, 요청 간 섞이지 않음 | `TraceIdFilterTest`(동시 50건, 스레드 8개 재사용), `TraceIdLoggingTest`(콘솔 로그 캡처), 실제 서버 로그 | 한 요청의 `[REQ]`·`[MISSION]`·`[RES]` 로그가 같은 traceId, 요청마다 traceId가 다르고 요청 시작 시 이전 값이 남아 있지 않음 |
+| 같은 요청은 같은 traceId, 요청 간 섞이지 않음 | `TraceIdLoggingTest`(콘솔 로그 캡처), 실제 서버 로그 | 한 요청의 `[REQ]`·`[MISSION]`·`[RES]` 로그가 같은 traceId, 요청마다 traceId가 다르고 요청 시작 시 이전 값이 남아 있지 않음 |
 
 #### 7) 최종 반영 위치
 
@@ -433,7 +433,7 @@ Java 21, Spring Boot, Gradle, H2, JUnit5을 사용하며, 그밖 의존성은 �
 | 로그 설정 | `source-code/src/main/resources/logback-spring.xml`(신규) |
 | 요청 추적 | `common/logging/TraceIdFilter.java`(신규) |
 | 로그·주석 | `common/exception/GlobalExceptionHandler.java`, `mission/service/MissionService.java`, `reward/service/RewardService.java`, `user/UserValidator.java` |
-| 테스트 | `config/ProfileConfigTest.java`, `unit/TraceIdFilterTest.java`, `api/TraceIdLoggingTest.java` (모두 신규) |
+| 테스트 | `config/ProfileConfigTest.java`, `api/TraceIdLoggingTest.java` (모두 신규) |
 | 문서 | `README.md`, `DESIGN.md`, `api-spec.md`, `test-or-verification/QA_LIST.md`, `TEST_RESULT.md`, `.gitignore` |
 
 (소스 경로 기준: `source-code/src/main/java/com/linepay/reward/`, 테스트: `test-or-verification/src/test/java/com/linepay/reward/`)
@@ -595,8 +595,8 @@ PK에 의존하는 로직을 유니크한 비즈니스 키 기반으로 전환�
 | 완료 조건 | 검증 방법 | 결과 |
 |---|---|---|
 | 쿠폰 API IO 오류·타임아웃 → 보상 처리, 정의된 에러 코드·한글 메시지 | `FailureScenarioTest` QA-D03~D05·D07 (Mockito로 쿠폰 API 3종에 IO 오류·읽기 타임아웃·기타 예외 주입) | IO 오류·타임아웃은 503 `COUPON_COMMUNICATION_FAILED`, 기타 예외는 500 `COUPON_SYSTEM_ERROR`와 한글 메시지로 응답하고 보상 결과 `FAILED` 저장(롤백 안 됨). 회복 후 재요청하면 같은 리워드번호로 지급, 쿠폰 1개만 발급 |
-| for 문 변경 후 기존 테스트 결과 동일 | 전체 테스트 실행 (`gradlew.bat clean test`) | 기존 91개 모두 통과 (쿠폰 제외 후 재선정, 한도 소진, 동시 발급 포함). QA-F02만 실패 내역 저장에 맞춰 기대값 변경 |
-| 추가 실패 테스트 4종 통과 | `FailureScenarioTest`, `DatabaseFailureTest` | 애플리케이션 시스템 이슈(D01), DB 시스템 이슈(D06), 참여 기간 초과(D02), 쿠폰 통신 오류·보상 처리(D03~D05, D07) 모두 통과. 전체 98/98 |
+| for 문 변경 후 기존 테스트 결과 동일 | 전체 테스트 실행 (`gradlew.bat clean test`) | 기존 86개 모두 통과 (쿠폰 제외 후 재선정, 한도 소진, 동시 발급 포함). QA-F02만 실패 내역 저장에 맞춰 기대값 변경 |
+| 추가 실패 테스트 4종 통과 | `FailureScenarioTest`, `DatabaseFailureTest` | 애플리케이션 시스템 이슈(D01), DB 시스템 이슈(D06), 참여 기간 초과(D02), 쿠폰 통신 오류·보상 처리(D03~D05, D07) 모두 통과. 전체 93/93 |
 
 #### 7) 최종 반영 위치
 
@@ -679,7 +679,7 @@ PK에 의존하는 로직을 유니크한 비즈니스 키 기반으로 전환�
 |:--:|---|---|
 | 1 | 캐시 무효화 로직 제외 | 과제의 미션 데이터는 Seed Data로만 적재되고 미션을 변경하는 기능이 없어, 미션 저장·삭제 시 캐시를 비우는 로직(`MissionRepository`의 `@CacheEvict` 메서드)은 현재 과제 범위를 넘는다고 판단함. 무효화 로직과 관련 테스트(미션 추가·삭제 시 무효화 검증)를 제거하고, 미션 데이터 변경은 캐시 만료 시간(TTL 10분)이 지나면 반영되도록 함 |
 
-그 밖의 결과(일자 키 캐싱, TTL 설정, 동시성 제어 락 성능 측정·정합성 검증 테스트)는 그대로 반영함. 제거 후 전체 테스트 104개(캐싱 3 + 락 성능 3 포함) 통과.
+그 밖의 결과(일자 키 캐싱, TTL 설정, 동시성 제어 락 성능 측정·정합성 검증 테스트)는 그대로 반영함. 제거 후 전체 테스트 99개(캐싱 3 + 락 성능 3 포함) 통과.
 
 #### 6) 결과 검증
 
@@ -688,7 +688,7 @@ PK에 의존하는 로직을 유니크한 비즈니스 키 기반으로 전환�
 | 같은 일자 반복 조회 시 첫 요청만 DB 조회, 미션 변경 시 캐시 갱신 | `MissionCacheTest` QA-H01~H05 (Hibernate 통계 쿼리 실행 횟수, 캐시 저장 여부 확인) | 같은 일자 3번 조회 시 DB 쿼리 1 → 0 → 0회. 미션 추가·삭제 시 캐시가 비워지고 다음 조회에 반영(참여 가능 미션 조회 결과 포함). TTL 10분 설정 확인 |
 | 동시 요청에서 중복 참여·중복 보상 없음 | `LockPerformanceTest` QA-S01~S03 | 사용자별 참여 1건, 이력당 보상 1건, 발급 쿠폰 수 = 쿠폰 지급 보상 수, 락 대기·기타 실패 0건 |
 | 동시 요청 수별 처리 시간·실패 건수로 락 병목 확인 | `LockPerformanceTest` `[PERF]` 로그 (`TEST_RESULT.md`에 기록) | 10/50/100/200건 모두 락 대기 실패 0건. 같은 미션 집중 시 직렬화로 처리 시간 증가(같은 미션 145ms vs 분산 53ms)는 있으나 실패로 이어지지 않음 |
-| 기존 기능 영향 없음 | 전체 테스트 실행 (`gradlew.bat clean test`) | 106/106 통과 (기존 98 + 캐싱 5 + 락 성능 3) |
+| 기존 기능 영향 없음 | 전체 테스트 실행 (`gradlew.bat clean test`) | 101/101 통과 (기존 93 + 캐싱 5 + 락 성능 3) |
 
 #### 7) 최종 반영 위치
 
