@@ -33,7 +33,7 @@ class DatabaseFailureTest extends IntegrationTestSupport {
     UserRepository failingUserRepository;
 
     @Test
-    @DisplayName("QA-D06 DB 시스템 이슈: DB 연결 실패 → 503 DATABASE_ERROR (한글 메시지), 참여 이력 생성 안 됨")
+    @DisplayName("QA-D03 DB 시스템 이슈: DB 연결 실패 → 503 DATABASE_ERROR (한글 메시지), 참여 이력 생성 안 됨")
     void databaseConnectionFailure() throws Exception {
         when(failingUserRepository.existsById(anyString()))
                 .thenThrow(new CannotGetJdbcConnectionException("DB 연결을 얻지 못함"));

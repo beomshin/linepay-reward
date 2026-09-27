@@ -582,8 +582,8 @@ PK에 의존하는 로직을 유니크한 비즈니스 키 기반으로 전환�
 | while → for | 보상 후보 선정을 `for (pickCount < 최초 후보 수 && 후보 남음)`으로 변경. 반복 횟수가 최초 후보 수를 넘지 않음 |
 | DB 장애 응답 | 전역 예외 핸들러에 `DataAccessException` 처리 추가 → 503 `DATABASE_ERROR` + 한글 메시지 |
 | 에러 코드 | `COUPON_COMMUNICATION_FAILED`(503), `DATABASE_ERROR`(503) 추가. `COUPON_SYSTEM_ERROR`(500)는 실패 내역을 저장하는 경우로 의미 확장 |
-| 실패 테스트 | `FailureScenarioTest`: 애플리케이션 시스템 이슈(QA-D01), 참여 기간 초과(QA-D02), 쿠폰 발급 IO 오류(QA-D03), 쿠폰 발급 읽기 타임아웃 후 재요청 지급(QA-D04), 템플릿 조회 IO 오류(QA-D05), 발급 결과 조회 기타 예외(QA-D07). `DatabaseFailureTest`: DB 연결 실패(QA-D06). 기존 QA-F02는 예상하지 못한 외부 오류 시 실패 내역이 저장되도록 기대값 변경 |
-| 문서 반영 | `api-spec.md`(FAILED 상태, `failureReason`, 에러 코드), `README.md`, `DESIGN.md`(6. 예외 처리 및 장애 방지), `QA_LIST.md`(QA-D), `TEST_RESULT.md` |
+| 실패 테스트 | `CouponFailureTest`(쿠폰 시스템 호출 실패): 쿠폰 발급 IO 오류(QA-F03), 쿠폰 발급 읽기 타임아웃 후 재요청 지급(QA-F04), 템플릿 조회 IO 오류(QA-F05), 발급 결과 조회 기타 예외(QA-F06), 기존 QA-F02는 예상하지 못한 외부 오류 시 실패 내역이 저장되도록 기대값 변경. `FailureScenarioTest`: 애플리케이션 시스템 이슈(QA-D01), 참여 기간 초과(QA-D02). `DatabaseFailureTest`: DB 연결 실패(QA-D03) |
+| 문서 반영 | `api-spec.md`(FAILED 상태, `failureReason`, 에러 코드), `README.md`, `DESIGN.md`(6. 예외 처리 및 장애 방지), `QA_LIST.md`(QA-F, QA-D), `TEST_RESULT.md` |
 
 
 #### 5) 본인의 판단 (그대로 반영 / 수정하여 반영 / 반영하지 않음 / 추가 확인 후 결정)
@@ -594,9 +594,9 @@ PK에 의존하는 로직을 유니크한 비즈니스 키 기반으로 전환�
 
 | 완료 조건 | 검증 방법 | 결과 |
 |---|---|---|
-| 쿠폰 API IO 오류·타임아웃 → 보상 처리, 정의된 에러 코드·한글 메시지 | `FailureScenarioTest` QA-D03~D05·D07 (Mockito로 쿠폰 API 3종에 IO 오류·읽기 타임아웃·기타 예외 주입) | IO 오류·타임아웃은 503 `COUPON_COMMUNICATION_FAILED`, 기타 예외는 500 `COUPON_SYSTEM_ERROR`와 한글 메시지로 응답하고 보상 결과 `FAILED` 저장(롤백 안 됨). 회복 후 재요청하면 같은 리워드번호로 지급, 쿠폰 1개만 발급 |
+| 쿠폰 API IO 오류·타임아웃 → 보상 처리, 정의된 에러 코드·한글 메시지 | `CouponFailureTest` QA-F03~F06 (Mockito로 쿠폰 API 3종에 IO 오류·읽기 타임아웃·기타 예외 주입) | IO 오류·타임아웃은 503 `COUPON_COMMUNICATION_FAILED`, 기타 예외는 500 `COUPON_SYSTEM_ERROR`와 한글 메시지로 응답하고 보상 결과 `FAILED` 저장(롤백 안 됨). 회복 후 재요청하면 같은 리워드번호로 지급, 쿠폰 1개만 발급 |
 | for 문 변경 후 기존 테스트 결과 동일 | 전체 테스트 실행 (`gradlew.bat clean test`) | 기존 80개 모두 통과 (쿠폰 제외 후 재선정, 한도 소진, 동시 발급 포함). QA-F02만 실패 내역 저장에 맞춰 기대값 변경 |
-| 추가 실패 테스트 4종 통과 | `FailureScenarioTest`, `DatabaseFailureTest` | 애플리케이션 시스템 이슈(D01), DB 시스템 이슈(D06), 참여 기간 초과(D02), 쿠폰 통신 오류·보상 처리(D03~D05, D07) 모두 통과. 전체 87/87 |
+| 추가 실패 테스트 4종 통과 | `FailureScenarioTest`, `DatabaseFailureTest`, `CouponFailureTest` | 애플리케이션 시스템 이슈(D01), DB 시스템 이슈(D03), 참여 기간 초과(D02), 쿠폰 통신 오류·보상 처리(F03~F06) 모두 통과. 전체 87/87 |
 
 #### 7) 최종 반영 위치
 
@@ -605,7 +605,7 @@ PK에 의존하는 로직을 유니크한 비즈니스 키 기반으로 전환�
 | 쿠폰 예외 처리·실패 내역 저장·반복문 | `reward/service/RewardService.java`, `reward/service/CouponFailureException.java`(신규), `reward/service/RewardFailedException.java`(신규) |
 | 보상 결과 | `reward/domain/Reward.java`(`markFailed`, `failure_reason`), `reward/domain/RewardStatus.java`(`FAILED`), `reward/dto/RewardResponse.java`(`failureReason`) |
 | 에러 코드·예외 처리 | `common/exception/ErrorCode.java`(`COUPON_COMMUNICATION_FAILED`, `DATABASE_ERROR`), `common/exception/GlobalExceptionHandler.java`(`DataAccessException`) |
-| 테스트 | `integration/FailureScenarioTest.java`(신규), `integration/DatabaseFailureTest.java`(신규), `integration/CouponIssueFallbackTest.java`(QA-F02) |
+| 테스트 | `integration/CouponFailureTest.java`(쿠폰 호출 실패 QA-F01~F06), `integration/FailureScenarioTest.java`(신규), `integration/DatabaseFailureTest.java`(신규) |
 | 문서 | `api-spec.md`, `README.md`, `DESIGN.md`, `test-or-verification/QA_LIST.md`, `TEST_RESULT.md` |
 
 (소스 경로 기준: `source-code/src/main/java/com/linepay/reward/`, 테스트: `test-or-verification/src/test/java/com/linepay/reward/`)

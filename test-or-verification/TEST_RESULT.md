@@ -15,10 +15,10 @@
 | `unit.FakeCouponSystemTest` | QA-C | 8 | 0 |
 | `integration.MissionServiceTest` | QA-M | 12 | 0 |
 | `integration.RewardServiceTest` | QA-R | 13 | 0 |
-| `integration.CouponIssueFallbackTest` | QA-F | 2 | 0 |
+| `integration.CouponFailureTest` | QA-F | 6 | 0 |
 | `integration.ConcurrencyTest` | QA-X | 4 | 0 |
 | `integration.BusinessKeyTest` | QA-K | 6 | 0 |
-| `integration.FailureScenarioTest` | QA-D | 6 | 0 |
+| `integration.FailureScenarioTest` | QA-D | 2 | 0 |
 | `integration.DatabaseFailureTest` | QA-D | 1 | 0 |
 | `integration.MissionCacheTest` | QA-H | 3 | 0 |
 | `integration.LockPerformanceTest` | QA-S | 3 | 0 |
@@ -79,7 +79,7 @@ QA-S03 락 경합 비교 (각 100건)
 |---|---|
 | 실행일 | 2026-09-26 (KST) |
 | 명령 | `gradlew.bat clean test bootJar` |
-| 결과 | **87개 전체 통과** (기존 80 + 실패·장애 7) |
+| 결과 | **87개 전체 통과** (기존 80 + 실패·장애 7: 쿠폰 호출 실패 QA-F03~F06, 애플리케이션·DB·기간 초과 QA-D01~D03) |
 
 | 테스트 클래스 | QA | 테스트 수 | 실패 |
 |---|---|---:|---:|
@@ -88,10 +88,10 @@ QA-S03 락 경합 비교 (각 100건)
 | `unit.FakeCouponSystemTest` | QA-C | 8 | 0 |
 | `integration.MissionServiceTest` | QA-M | 12 | 0 |
 | `integration.RewardServiceTest` | QA-R | 13 | 0 |
-| `integration.CouponIssueFallbackTest` | QA-F | 2 | 0 |
+| `integration.CouponFailureTest` | QA-F | 6 | 0 |
 | `integration.ConcurrencyTest` | QA-X | 4 | 0 |
 | `integration.BusinessKeyTest` | QA-K | 6 | 0 |
-| `integration.FailureScenarioTest` | QA-D | 6 | 0 |
+| `integration.FailureScenarioTest` | QA-D | 2 | 0 |
 | `integration.DatabaseFailureTest` | QA-D | 1 | 0 |
 | `api.RewardApiTest` | QA-A | 8 | 0 |
 | `api.RequestValidationApiTest` | QA-V | 16 | 0 |
@@ -101,9 +101,9 @@ QA-S03 락 경합 비교 (각 100건)
 
 | 완료 조건 | 결과 |
 |---|---|
-| 쿠폰 API IO 오류·타임아웃 → 보상 처리, 정의된 에러 코드·한글 메시지 | QA-D03~D05·D07 통과. IO 오류·읽기 타임아웃은 503 `COUPON_COMMUNICATION_FAILED`, 기타 예외는 500 `COUPON_SYSTEM_ERROR`와 한글 메시지로 응답하고 보상 결과 `FAILED` 저장. 회복 후 재요청하면 같은 리워드번호로 지급. (재시도 로직은 두지 않았으므로 "정해진 횟수만큼 재시도"는 해당 없음 — 쿠폰 API는 1회 호출) |
+| 쿠폰 API IO 오류·타임아웃 → 보상 처리, 정의된 에러 코드·한글 메시지 | QA-F03~F06 통과. IO 오류·읽기 타임아웃은 503 `COUPON_COMMUNICATION_FAILED`, 기타 예외는 500 `COUPON_SYSTEM_ERROR`와 한글 메시지로 응답하고 보상 결과 `FAILED` 저장. 회복 후 재요청하면 같은 리워드번호로 지급. (재시도 로직은 두지 않았으므로 "정해진 횟수만큼 재시도"는 해당 없음 — 쿠폰 API는 1회 호출) |
 | for 문 변경 후 기존 테스트 결과 동일 | 기존 80개 모두 통과 (쿠폰 제외 후 재선정 QA-F01, 한도 소진 QA-R09·R13, 동시 발급 QA-X04 포함). QA-F02만 실패 내역 저장에 맞춰 기대값 변경 (저장 안 됨 → FAILED 저장) |
-| 추가 실패 테스트 4종 통과 | 애플리케이션 시스템 이슈(QA-D01), DB 시스템 이슈(QA-D06), 참여 기간 초과(QA-D02), 쿠폰 통신 오류·보상 처리(QA-D03~D05, D07) 모두 통과 |
+| 추가 실패 테스트 4종 통과 | 애플리케이션 시스템 이슈(QA-D01), DB 시스템 이슈(QA-D03), 참여 기간 초과(QA-D02), 쿠폰 통신 오류·보상 처리(QA-F03~F06) 모두 통과 |
 
 ---
 
@@ -129,7 +129,7 @@ QA-S03 락 경합 비교 (각 100건)
 | `unit.FakeCouponSystemTest` | QA-C | 8 | 0 |
 | `integration.MissionServiceTest` | QA-M | 12 | 0 |
 | `integration.RewardServiceTest` | QA-R | 13 | 0 |
-| `integration.CouponIssueFallbackTest` | QA-F | 2 | 0 |
+| `integration.CouponFailureTest` | QA-F | 2 | 0 |
 | `integration.ConcurrencyTest` | QA-X | 4 | 0 |
 | `integration.BusinessKeyTest` | QA-K | 6 | 0 |
 | `api.RewardApiTest` | QA-A | 8 | 0 |
@@ -155,7 +155,7 @@ QA-S03 락 경합 비교 (각 100건)
 | `unit.FakeCouponSystemTest` | QA-C | 8 | 0 |
 | `integration.MissionServiceTest` | QA-M | 12 | 0 |
 | `integration.RewardServiceTest` | QA-R | 13 | 0 |
-| `integration.CouponIssueFallbackTest` | QA-F | 2 | 0 |
+| `integration.CouponFailureTest` | QA-F | 2 | 0 |
 | `integration.ConcurrencyTest` | QA-X | 4 | 0 |
 | `integration.BusinessKeyTest` | QA-K | 6 | 0 |
 | `integration.ExplainPlanTest` | QA-I | 7 | 0 |
@@ -216,7 +216,7 @@ QA-S03 락 경합 비교 (각 100건)
 | `unit.FakeCouponSystemTest` | QA-C | 8 | 0 |
 | `integration.MissionServiceTest` | QA-M | 12 | 0 |
 | `integration.RewardServiceTest` | QA-R | 13 | 0 |
-| `integration.CouponIssueFallbackTest` | QA-F | 2 | 0 |
+| `integration.CouponFailureTest` | QA-F | 2 | 0 |
 | `integration.ConcurrencyTest` | QA-X | 4 | 0 |
 | `api.RewardApiTest` | QA-A | 8 | 0 |
 | `api.RequestValidationApiTest` | QA-V | 15 | 0 |
@@ -294,7 +294,7 @@ INFO  [99a1...] [RES] 요청 종료 - POST /linepay/v1/reward/USER_0002/1 상태
 | `unit.FakeCouponSystemTest` | QA-C | 8 | 0 |
 | `integration.MissionServiceTest` | QA-M | 12 | 0 |
 | `integration.RewardServiceTest` | QA-R | 13 | 0 |
-| `integration.CouponIssueFallbackTest` | QA-F | 2 | 0 |
+| `integration.CouponFailureTest` | QA-F | 2 | 0 |
 | `integration.ConcurrencyTest` | QA-X | 4 | 0 |
 | `api.RewardApiTest` | QA-A | 8 | 0 |
 | `api.RequestValidationApiTest` | QA-V | 15 | 0 |
@@ -341,7 +341,7 @@ INFO  [99a1...] [RES] 요청 종료 - POST /linepay/v1/reward/USER_0002/1 상태
 | `unit.FakeCouponSystemTest` | QA-C | 8 | 0 | 0.008 |
 | `integration.MissionServiceTest` | QA-M | 12 | 0 | 0.599 |
 | `integration.RewardServiceTest` | QA-R | 13 | 0 | 0.296 |
-| `integration.CouponIssueFallbackTest` | QA-F | 2 | 0 | 0.162 |
+| `integration.CouponFailureTest` | QA-F | 2 | 0 | 0.162 |
 | `integration.ConcurrencyTest` | QA-X | 4 | 0 | 0.959 |
 | `api.RewardApiTest` | QA-A | 8 | 0 | 1.022 |
 | **합계** | | **58** | **0** | |

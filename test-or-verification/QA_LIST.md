@@ -10,12 +10,12 @@
 | QA-C | `unit/FakeCouponSystemTest` | 단위 |
 | QA-M | `integration/MissionServiceTest` | 통합 (H2, 트랜잭션) |
 | QA-R | `integration/RewardServiceTest` | 통합 |
-| QA-F | `integration/CouponIssueFallbackTest` | 통합 (외부 오류 주입) |
+| QA-F | `integration/CouponFailureTest` | 통합 + API (쿠폰 시스템 호출 실패, 외부 오류 주입) |
 | QA-X | `integration/ConcurrencyTest` | 통합 (동시성) |
 | QA-A | `api/RewardApiTest` | API (MockMvc) |
 | QA-V | `api/RequestValidationApiTest` | API (MockMvc, 요청값 검증) |
 | QA-K | `integration/BusinessKeyTest` | 통합 (비즈니스 키 채번, 유니크 제약) |
-| QA-D | `integration/FailureScenarioTest`, `integration/DatabaseFailureTest` | 통합 + API (실패·장애 상황) |
+| QA-D | `integration/FailureScenarioTest`, `integration/DatabaseFailureTest` | 통합 + API (애플리케이션·DB 장애, 참여 기간 초과) |
 | QA-H | `integration/MissionCacheTest` | 통합 (일자별 미션 조회 캐싱) |
 | QA-S | `integration/LockPerformanceTest` | 통합 (동시성 제어 락 성능 측정) |
 
@@ -88,12 +88,16 @@
 | QA-R12 | 외부 발급은 됐지만 저장 전에 실패한 경우 재요청하면 같은 쿠폰으로 복구 (중복 발급 없음) |
 | QA-R13 | 한도 1개 쿠폰: 첫 번째만 쿠폰, 두 번째는 NO_REWARD |
 
-## 6. 쿠폰 발급 시점 실패 (과제 7.3, 8.2)
+## 6. 쿠폰 시스템 호출 실패 (과제 7.3, 8.2 / 교정 4)
 
 | ID | 검증 항목 |
 |---|---|
 | QA-F01 | 조회 때는 가능했지만 발급 때 한도 소진 → 쿠폰 제외 후 포인트로 재선정 |
 | QA-F02 | 예상하지 못한 외부 오류(REQUEST_ID_CONFLICT) → COUPON_SYSTEM_ERROR(500), 보상 결과 FAILED 저장 |
+| QA-F03 | 쿠폰 발급 IO 오류 → 503 COUPON_COMMUNICATION_FAILED(한글 메시지), 보상 결과 FAILED 저장(롤백 안 됨), 결과 조회도 FAILED |
+| QA-F04 | 쿠폰 발급 읽기 타임아웃(`SocketTimeoutException`) → FAILED, 쿠폰 시스템 회복 뒤 같은 이력번호로 재요청하면 같은 리워드번호로 쿠폰 지급, 쿠폰 1개만 발급 |
+| QA-F05 | 쿠폰 템플릿 조회 IO 오류 → 503 COUPON_COMMUNICATION_FAILED, FAILED 저장 |
+| QA-F06 | 쿠폰 발급 결과 조회 중 예상하지 못한 예외(`IllegalStateException`) → 500 COUPON_SYSTEM_ERROR(한글 메시지), FAILED 저장 (사유: `쿠폰 발급 결과 조회 실패 (IllegalStateException)`) |
 
 ## 7. 반복·동시 요청 (과제 5절)
 
@@ -147,11 +151,9 @@
 |---|---|---|
 | QA-D01 | 애플리케이션 시스템 이슈 | 처리 중 예상하지 못한 예외 → 500 INTERNAL_SERVER_ERROR(한글 메시지, data=null), 참여 이력 생성 안 됨 |
 | QA-D02 | 참여 기간 초과 | 종료 시각(2027-01-01 00:00:00) 완료 요청 → 409 MISSION_NOT_IN_PERIOD, 이력 없음. 1초 전(23:59:59)은 성공 |
-| QA-D03 | 쿠폰 발급 IO 오류 | 쿠폰 발급 IO 오류 → 503 COUPON_COMMUNICATION_FAILED(한글 메시지), 보상 결과 FAILED 저장(롤백 안 됨), 결과 조회도 FAILED |
-| QA-D04 | 쿠폰 발급 타임아웃 → 재요청 | 읽기 타임아웃 예외(`SocketTimeoutException`) → FAILED, 쿠폰 시스템 회복 뒤 같은 이력번호로 재요청하면 같은 리워드번호로 쿠폰 지급, 쿠폰 1개만 발급 |
-| QA-D05 | 쿠폰 템플릿 조회 IO 오류 | 템플릿 조회 IO 오류 → 503 COUPON_COMMUNICATION_FAILED, FAILED 저장 |
-| QA-D07 | 쿠폰 발급 결과 조회 기타 예외 | 발급 결과 조회 중 예상하지 못한 예외(`IllegalStateException`) → 500 COUPON_SYSTEM_ERROR(한글 메시지), FAILED 저장 (사유: `쿠폰 발급 결과 조회 실패 (IllegalStateException)`) |
-| QA-D06 | DB 시스템 이슈 | DB 연결 실패 → 503 DATABASE_ERROR(한글 메시지), 참여 이력 생성 안 됨 |
+| QA-D03 | DB 시스템 이슈 | DB 연결 실패 → 503 DATABASE_ERROR(한글 메시지), 참여 이력 생성 안 됨 |
+
+쿠폰 통신 오류·보상 처리 실패 테스트는 6절(QA-F03~F06)에 있습니다.
 
 ## 12. 일자별 미션 조회 캐싱 (교정 5)
 
