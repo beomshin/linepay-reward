@@ -161,6 +161,7 @@ class RewardApiTest extends IntegrationTestSupport {
     @Test
     @DisplayName("QA-A07 NO_REWARD 는 오류가 아닌 정상 결과(200)로 반환된다")
     void noRewardIsSuccess() throws Exception {
+        // 메모리상 쿠폰이 등록되어있지 않아서 미조회
         String missionId = TEST_PREFIX + "COUPON_MISSION";
         createMission(missionId);
         createCouponItem(TEST_PREFIX + "ITEM_C", missionId, "COUPON_TEMPLATE_UNKNOWN");
