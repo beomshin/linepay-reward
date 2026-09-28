@@ -1,7 +1,7 @@
 package com.linepay.reward.coupon;
 
 /**
- * 외부 쿠폰 시스템의 실패 결과 구분 (과제 8절).
+ * 외부 쿠폰 시스템의 실패 결과 구분
  * 실제 HTTP 통신을 대신하므로 각 결과에 대응하는 HTTP 상태를 함께 표기한다.
  */
 public enum CouponErrorType {

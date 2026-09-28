@@ -41,14 +41,14 @@ public class FakeCouponSystem implements CouponClient {
         registerTemplate("COUPON_TEMPLATE_0001", "10% 할인 쿠폰", 100, 0, CouponTemplateStatus.AVAILABLE);
     }
 
-    /** 쿠폰 템플릿 등록/덮어쓰기 (외부 시스템 운영 상황 재현용) */
+    /** 쿠폰 템플릿 등록/덮어쓰기 (외부 시스템 운영 상황 재현용) 태스트코드 */
     public synchronized void registerTemplate(String couponTemplateId, String title,
                                               int maxQuantity, int issuedQuantity,
                                               CouponTemplateStatus status) {
         templates.put(couponTemplateId, new Template(couponTemplateId, title, maxQuantity, issuedQuantity, status));
     }
 
-    /** 쿠폰 템플릿 상태 변경 (예: 발급 중지 재현) */
+    /** 쿠폰 템플릿 상태 변경 (예: 발급 중지 재현) 태스트코드 */
     public synchronized void changeStatus(String couponTemplateId, CouponTemplateStatus status) {
         Template template = templates.get(couponTemplateId);
         if (template == null) {
@@ -71,7 +71,7 @@ public class FakeCouponSystem implements CouponClient {
         // 1) 멱등 처리: 같은 requestId 가 이미 있으면 내용 비교
         Issue existing = issues.get(request.requestId());
         if (existing != null) {
-            if (existing.isSameContent(request)) {
+            if (existing.isSameContent(request)) { // userId, couponTemplateId 일치 여부 판단
                 return existing.toResponse();
             }
             throw new CouponApiException(CouponErrorType.REQUEST_ID_CONFLICT);

@@ -1,7 +1,7 @@
 package com.linepay.reward.coupon;
 
 /**
- * 외부 쿠폰 시스템 클라이언트 계약 (과제 8절).
+ * 외부 쿠폰 시스템 클라이언트 계약
  * <p>
  * 리워드 서비스는 이 인터페이스에만 의존한다.
  * 실제 HTTP 통신 대신 {@link FakeCouponSystem} 이 계약에 정의된 동작을 재현한다.

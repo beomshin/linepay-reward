@@ -42,7 +42,7 @@
 ## 3. 실행 방법
 
 ```bash
-# macOS / Linux (프로파일 미지정 시 local)
+# macOS / Linux (프로파일 미지정 시 dev)
 ./gradlew bootRun
 
 # Windows

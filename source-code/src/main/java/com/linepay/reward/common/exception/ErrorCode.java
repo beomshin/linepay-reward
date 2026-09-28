@@ -7,7 +7,7 @@ import org.springframework.http.HttpStatus;
 /**
  * 서비스 에러 코드 정의.
  * <ul>
- *     <li>{@code code} : 실패 사유를 나타내는 영문 코드 (= enum 상수명, 예: MISSION_NOT_FOUND)</li>
+ *     <li>{@code code} : 실패 사유를 나타내는 영문 코드</li>
  *     <li>{@code msg}  : 클라이언트가 이해하기 쉬운 한글 메시지</li>
  *     <li>{@code httpStatus} : 결과에 맞는 HTTP 상태 코드</li>
  * </ul>
@@ -18,11 +18,11 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
 
     // ---------- 400 잘못된 요청 (요청값 검증) ----------
-    /** 필수 요청값 누락 (@NotBlank, @NotNull) */
+    /** 필수 요청값 누락 */
     MISSING_REQUIRED_VALUE(HttpStatus.BAD_REQUEST, "필수 요청값이 누락되었습니다."),
-    /** 요청값 형식 오류 (@Pattern, @Size, 타입 불일치) */
+    /** 요청값 형식 오류 */
     INVALID_FORMAT(HttpStatus.BAD_REQUEST, "요청값 형식이 올바르지 않습니다."),
-    /** 요청값 범위 오류 (@Positive 등) */
+    /** 요청값 범위 오류 */
     OUT_OF_RANGE(HttpStatus.BAD_REQUEST, "요청값이 허용 범위를 벗어났습니다."),
 
     // ---------- 404 대상 없음 ----------
@@ -39,7 +39,7 @@ public enum ErrorCode {
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 HTTP 메서드입니다."),
 
     // ---------- 409 중복·상태 충돌 ----------
-    /** 미션 참여 가능 기간이 아님 (entry_start_at <= 현재 < entry_end_at 불만족) */
+    /** 미션 참여 가능 기간이 아님  */
     MISSION_NOT_IN_PERIOD(HttpStatus.CONFLICT, "미션 참여 가능 기간이 아닙니다."),
     /** 미션별 전체 참여 횟수(100회) 초과 */
     MISSION_TOTAL_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "미션 전체 참여 횟수를 초과했습니다."),
@@ -62,7 +62,7 @@ public enum ErrorCode {
     private final HttpStatus httpStatus;
     private final String message;
 
-    /** 응답 code 값 (영문 사유 코드) */
+    /** 응답 code 값 */
     public String getCode() {
         return name();
     }

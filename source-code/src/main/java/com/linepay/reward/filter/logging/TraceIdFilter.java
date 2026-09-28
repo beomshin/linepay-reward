@@ -1,4 +1,4 @@
-package com.linepay.reward.common.logging;
+package com.linepay.reward.filter.logging;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

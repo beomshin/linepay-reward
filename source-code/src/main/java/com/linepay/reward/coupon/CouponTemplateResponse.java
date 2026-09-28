@@ -1,7 +1,7 @@
 package com.linepay.reward.coupon;
 
 /**
- * GET /coupon-templates/{couponTemplateId} 성공 응답 (과제 8.1)
+ * GET /coupon-templates/{couponTemplateId} 성공 응답
  */
 public record CouponTemplateResponse(
         String couponTemplateId,

@@ -1,6 +1,6 @@
 package com.linepay.reward.coupon;
 
-/** 외부 쿠폰 템플릿 상태 (과제 8.1) */
+/** 외부 쿠폰 템플릿 상태  */
 public enum CouponTemplateStatus {
     /** 발급 가능 */
     AVAILABLE,
