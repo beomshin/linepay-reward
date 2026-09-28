@@ -41,13 +41,13 @@ public final class ParticipationPolicy {
                                             long totalCount,
                                             long userDailyCount,
                                             LocalDateTime lastParticipatedAt) {
-        if (!mission.isInEntryPeriod(now)) {
+        if (!mission.isInEntryPeriod(now)) { // 미션 참여 가능 기간이 아닐 경우
             return Optional.of(ErrorCode.MISSION_NOT_IN_PERIOD);
         }
-        if (totalCount >= MAX_TOTAL_PARTICIPATION) {
+        if (totalCount >= MAX_TOTAL_PARTICIPATION) { // 미션 참여 횟수 제한 초과
             return Optional.of(ErrorCode.MISSION_TOTAL_LIMIT_EXCEEDED);
         }
-        if (userDailyCount >= MAX_DAILY_PARTICIPATION_PER_USER) {
+        if (userDailyCount >= MAX_DAILY_PARTICIPATION_PER_USER) { // 사용자가 하루에 참여 가능한 횟수 초과
             return Optional.of(ErrorCode.MISSION_DAILY_LIMIT_EXCEEDED);
         }
         // 직전 참여 시각 + 1시간 <= 현재 시각 이어야 재참여 가능

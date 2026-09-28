@@ -46,12 +46,11 @@ public interface MissionParticipationRepository extends JpaRepository<MissionPar
              order by p.participatedDate desc, p.participatedTime desc
             """)
     List<MissionParticipation> findRecentByUser(@Param("missionId") String missionId,
-                                                @Param("userId") String userId,
-                                                Pageable pageable);
+                                                @Param("userId") String userId);
 
     /** 사용자의 해당 미션 직전 참여 이력 1건 */
     default Optional<MissionParticipation> findLatestByUser(String missionId, String userId) {
-        return findRecentByUser(missionId, userId, PageRequest.of(0, 1)).stream().findFirst();
+        return findRecentByUser(missionId, userId).stream().findFirst();
     }
 
     /** 이력번호로 단건 조회 (uk_participation_no) */
