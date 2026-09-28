@@ -146,6 +146,10 @@ public class RewardService {
 
         // [복구] 이전 요청에서 외부 쿠폰 발급은 성공했지만 결과 저장 전에 실패(롤백)한 경우,
         //        외부 시스템에 남은 발급 결과(8.3)를 찾아 그대로 반영해 쿠폰이 유실되지 않게 한다.
+        /**
+         * 쿠폰 발급 여부 판단을 쿠폰 API 조회로 처리되고 있다.
+         * 실패 내역이 있는경우만 조회한다와 같은 정책에 따라 변경될 여지가 있는 코드
+         */
         for (MissionItem item : items) {
             if (item.isCoupon()) {
                 Optional<CouponIssueResponse> issued = findIssuedCoupon(couponRequestId(participation, item));
@@ -194,7 +198,7 @@ public class RewardService {
                         || e.getErrorType() == CouponErrorType.INVALID_TEMPLATE) {
                     log.info("[COUPON] 쿠폰 발급 거절 → 후보에서 제외 후 재선정 couponTemplateId={} 사유={}",
                             picked.getCouponTemplateId(), e.getErrorType());
-                    candidates.remove(picked);
+                    candidates.remove(picked); // 보상 대상 항목 제외
                     continue;
                 }
                 throw couponFailure("쿠폰 발급", ErrorCode.COUPON_SYSTEM_ERROR, e);          // 예상하지 못한 응답
