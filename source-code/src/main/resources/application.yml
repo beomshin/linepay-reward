@@ -8,7 +8,7 @@ spring:
   application:
     name: linepay-reward
   profiles:
-    default: local
+    default: dev
   datasource:
     # 외부 인프라 없이 실행할 수 있도록 In-memory H2 사용 (과제 3절 실행 조건)
     url: jdbc:h2:mem:linepay;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000

@@ -24,7 +24,7 @@ public interface MissionRepository extends JpaRepository<Mission, String> {
      * 미션 데이터 변경은 캐시 만료 시간(TTL, application.yml)이 지나면 반영된다.
      * (일자 안에서 시각에 따라 달라지는 기간 판단은 캐시 밖의 참여 정책에서 하므로 일자 단위 캐싱으로 충분하다)
      */
-    @Cacheable(cacheNames = CacheConfig.ENTRY_PERIOD_MISSIONS, key = "#p0")
+    @Cacheable(cacheNames = CacheConfig.ENTRY_PERIOD_MISSIONS, key = "#today")
     @Query("""
             select m from Mission m
              where m.entryStartDate <= :today

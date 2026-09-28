@@ -24,7 +24,7 @@ public class ClockConfig {
     @Bean
     public Clock clock(@Value("${linepay.clock.fixed-at:}") String fixedAt) {
         if (StringUtils.hasText(fixedAt)) {
-            return Clock.fixed(OffsetDateTime.parse(fixedAt).toInstant(), KstTime.ZONE);
+            return Clock.fixed(OffsetDateTime.parse(fixedAt).toInstant(), KstTime.ZONE);    // 테스트용
         }
         return Clock.system(KstTime.ZONE);
     }
